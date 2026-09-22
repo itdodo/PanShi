@@ -33,6 +33,7 @@ services:
       ASPNETCORE_ENVIRONMENT: Production
       Db__ConnectionString: "Host=panshi-db;Port=5432;Database=panshi;Username=panshi;Password=${PANSHI_DB_PASSWORD};Pooling=true;Maximum Pool Size=50"
       Db__SnowflakeWorkerId: "1"
+      Db__BackupDir: "/backups"   # 备份写入 api↔db 共享挂载(持久化到宿主 ./backups)，勿用相对 backups→/app/backups
       Jwt__SecretKey: ${PANSHI_JWT_SECRET:?PANSHI_JWT_SECRET 未设置，请复制 .env.example 为 .env（openssl rand -hex 32）}
       TZ: Asia/Shanghai
     ports:
