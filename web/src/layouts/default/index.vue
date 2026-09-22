@@ -47,7 +47,7 @@ onBeforeUnmount(() => {
         <TabsBar />
       </div>
 
-      <NLayout position="static" class="ps-layout__content" :content-style="{ padding: '14px' }">
+      <NLayout position="static" class="ps-layout__content" :content-style="{ padding: '0', background: 'var(--ps-page-bg)' }">
         <RouterView v-slot="{ Component, route: current }">
           <KeepAlive :include="cachedNames">
             <component :is="Component" :key="tabs.componentKey(current.path)" />
