@@ -1,0 +1,131 @@
+/* ==========================================================================
+   Panshi 全局样式：基础重置 + 全局滚动条（8px 圆角半透明，webkit + Firefox）
+   主题色/暗色由 Naive UI NConfigProvider 负责，这里只处理非组件样式
+   ========================================================================== */
+
+:root {
+  --ps-primary: #2563eb;
+  --ps-primary-soft: rgba(37, 99, 235, 0.12);
+  --ps-header-h: 56px;
+  --ps-tabs-h: 40px;
+  --ps-radius: 8px;
+  --ps-scrollbar-size: 8px;
+  --ps-scroll-thumb: rgba(100, 116, 139, 0.35);
+  --ps-scroll-thumb-hover: rgba(100, 116, 139, 0.6);
+  --ps-page-bg: #f5f7fa;
+  --ps-text-1: #1f2937;
+  --ps-text-3: #6b7280;
+}
+
+html.ps-dark {
+  --ps-page-bg: #101014;
+  --ps-text-1: #e5e7eb;
+  --ps-text-3: #9ca3af;
+  --ps-scroll-thumb: rgba(148, 163, 184, 0.28);
+  --ps-scroll-thumb-hover: rgba(148, 163, 184, 0.5);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+/* NConfigProvider 会渲染一层 <div class="n-config-provider">，默认高度 auto 会打断
+   #app→视图 的 height:100% 传递，导致登录页/布局只撑到内容高度（下方留白）。补满即可。 */
+#app > .n-config-provider {
+  height: 100%;
+}
+
+body {
+  font-family: 'Inter', 'PingFang SC', 'Microsoft YaHei', -apple-system, BlinkMacSystemFont,
+    'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+  font-size: 14px;
+  color: var(--ps-text-1);
+  background: var(--ps-page-bg);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+a {
+  color: var(--ps-primary);
+  text-decoration: none;
+}
+
+/* —— 全局滚动条：8px 圆角半透明 —— */
+* {
+  scrollbar-width: thin; /* Firefox */
+  scrollbar-color: var(--ps-scroll-thumb) transparent;
+}
+
+::-webkit-scrollbar {
+  width: var(--ps-scrollbar-size);
+  height: var(--ps-scrollbar-size);
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--ps-scroll-thumb);
+  border-radius: var(--ps-scrollbar-size);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--ps-scroll-thumb-hover);
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* —— 长内容弹窗：限高 + 内容区滚动（底部按钮固定） —— */
+.dialog-scroll {
+  max-height: min(64vh, 560px);
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 4px;
+}
+
+/* —— 路由切换动画 —— */
+.ps-fade-enter-active,
+.ps-fade-leave-active {
+  transition: opacity 0.16s ease;
+}
+
+.ps-fade-enter-from,
+.ps-fade-leave-to {
+  opacity: 0;
+}
+
+/* —— 通用工具类 —— */
+.ps-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ps-grow {
+  flex: 1 1 auto;
+}
+
+.ps-muted {
+  color: var(--ps-text-3);
+}
+
+.ps-ellipsis {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ps-page {
+  padding: 16px;
+}

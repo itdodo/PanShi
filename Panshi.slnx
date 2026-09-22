@@ -1,0 +1,14 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Panshi.Api/Panshi.Api.csproj" />
+    <Project Path="src/Panshi.Common/Panshi.Common.csproj" />
+    <Project Path="src/Panshi.Middleware/Panshi.Middleware.csproj" />
+    <Project Path="src/Panshi.Model/Panshi.Model.csproj" />
+    <Project Path="src/Panshi.Repository/Panshi.Repository.csproj" />
+    <Project Path="src/Panshi.Service/Panshi.Service.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Panshi.IntegrationTests/Panshi.IntegrationTests.csproj" />
+    <Project Path="tests/Panshi.Tests/Panshi.Tests.csproj" />
+  </Folder>
+</Solution>

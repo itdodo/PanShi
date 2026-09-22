@@ -1,0 +1,147 @@
+using SqlSugar;
+
+namespace Panshi.Model.Enums;
+
+/// <summary>启用状态（sys_user/sys_role/menu/position/dict_data/notice 通用）</summary>
+public enum EnableStatus
+{
+    /// <summary>正常</summary>
+    Enabled = 0,
+
+    /// <summary>停用</summary>
+    Disabled = 1
+}
+
+/// <summary>菜单类型</summary>
+public enum MenuType
+{
+    /// <summary>目录</summary>
+    Directory = 1,
+
+    /// <summary>菜单（页面）</summary>
+    Menu = 2,
+
+    /// <summary>按钮（仅作权限码载体）</summary>
+    Button = 3
+}
+
+/// <summary>数据权限范围（五档）</summary>
+public enum DataScopeType
+{
+    /// <summary>全部数据</summary>
+    All = 1,
+
+    /// <summary>本部门</summary>
+    Dept = 2,
+
+    /// <summary>本部门及以下</summary>
+    DeptAndChild = 3,
+
+    /// <summary>仅本人</summary>
+    Self = 4,
+
+    /// <summary>自定义（sys_role_dept）</summary>
+    Custom = 5
+}
+
+/// <summary>公告类型</summary>
+public enum NoticeType
+{
+    /// <summary>通知</summary>
+    Notification = 1,
+
+    /// <summary>公告</summary>
+    Announcement = 2
+}
+
+/// <summary>公告状态（定时发布由 sys.notice.publish 作业到期 2→1）</summary>
+public enum NoticeStatus
+{
+    /// <summary>停用</summary>
+    Stopped = 0,
+
+    /// <summary>已发布</summary>
+    Published = 1,
+
+    /// <summary>定时发布</summary>
+    Scheduled = 2
+}
+
+/// <summary>站内信类型</summary>
+public enum MessageType
+{
+    /// <summary>系统</summary>
+    System = 1,
+
+    /// <summary>站内信</summary>
+    InSite = 2,
+
+    /// <summary>业务</summary>
+    Business = 3
+}
+
+/// <summary>审批实例状态</summary>
+public enum FlowInstanceStatus
+{
+    /// <summary>审批中</summary>
+    Running = 1,
+
+    /// <summary>通过</summary>
+    Approved = 2,
+
+    /// <summary>拒绝（终态）</summary>
+    Rejected = 3,
+
+    /// <summary>撤回（发起人无人处理时可撤）</summary>
+    Withdrawn = 4,
+
+    /// <summary>作废</summary>
+    Voided = 5
+}
+
+/// <summary>审批任务状态</summary>
+public enum FlowTaskStatus
+{
+    /// <summary>待办</summary>
+    Pending = 1,
+
+    /// <summary>同意</summary>
+    Agreed = 2,
+
+    /// <summary>拒绝</summary>
+    Rejected = 3,
+
+    /// <summary>转办（原任务止，新人生成待办）</summary>
+    Transferred = 4,
+
+    /// <summary>自动通过（审批人=发起人/已审重复/退回后不适用时为常规）</summary>
+    AutoPassed = 5,
+
+    /// <summary>失效（或签一人定局/拒绝终态/驳回时其余待办作废）</summary>
+    Invalidated = 6,
+
+    /// <summary>等待（依次审批中尚未轮到）</summary>
+    Waiting = 7,
+
+    /// <summary>已驳回（驳回至节点动作的落地状态）</summary>
+    Returned = 8
+}
+
+/// <summary>业务单据审批状态（Biz* 样板）</summary>
+public enum BizDocStatus
+{
+    /// <summary>草稿（未提交）</summary>
+    Draft = 0,
+
+    /// <summary>审批中</summary>
+    Running = 1,
+
+    /// <summary>通过</summary>
+    Approved = 2,
+
+    /// <summary>拒绝</summary>
+    Rejected = 3,
+
+    /// <summary>撤回</summary>
+    Withdrawn = 4
+}

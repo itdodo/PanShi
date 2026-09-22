@@ -1,0 +1,30 @@
+# ---------- 阶段1：前端构建 ----------
+FROM node:22-alpine AS web-build
+WORKDIR /src/web
+COPY web/package*.json ./
+RUN npm ci --no-audit --no-fund
+COPY web/ ./
+RUN npm run build
+
+# ---------- 阶段2：后端编译 ----------
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS api-build
+WORKDIR /src
+COPY Directory.Build.props Panshi.slnx ./
+COPY src/Panshi.Model src/Panshi.Model
+COPY src/Panshi.Common src/Panshi.Common
+COPY src/Panshi.Repository src/Panshi.Repository
+COPY src/Panshi.Service src/Panshi.Service
+COPY src/Panshi.Middleware src/Panshi.Middleware
+COPY src/Panshi.Api src/Panshi.Api
+RUN dotnet publish src/Panshi.Api -c Release -o /publish /p:NoWarn=NETSDK1138
+
+# ---------- 阶段3：运行时单容器（API + 静态资源） ----------
+FROM mcr.microsoft.com/dotnet/aspnet:10.0
+RUN apt-get update && apt-get install -y --no-install-recommends postgresql-client && rm -rf /var/lib/apt/lists/*
+WORKDIR /app
+COPY --from=api-build /publish ./
+COPY --from=web-build /src/web/dist ./wwwroot
+RUN mkdir -p /app/uploads /app/logs
+ENV TZ=Asia/Shanghai
+EXPOSE 8080
+ENTRYPOINT ["dotnet", "Panshi.Api.dll"]

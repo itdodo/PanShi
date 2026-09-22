@@ -1,0 +1,46 @@
+name: panshi
+
+services:
+  panshi-db:
+    image: postgres:17-alpine
+    container_name: panshi-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: panshi
+      POSTGRES_PASSWORD: ${PANSHI_DB_PASSWORD:?PANSHI_DB_PASSWORD 未设置，请复制 .env.example 为 .env}
+      POSTGRES_DB: panshi
+      TZ: Asia/Shanghai
+    ports:
+      - "5432:5432"
+    volumes:
+      - db-data:/var/lib/postgresql/data
+      - ./backups:/backups
+      - ./deploy/db-init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U panshi -d panshi"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  panshi-api:
+    build: .
+    container_name: panshi-api
+    restart: unless-stopped
+    depends_on:
+      panshi-db:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      Db__ConnectionString: "Host=panshi-db;Port=5432;Database=panshi;Username=panshi;Password=${PANSHI_DB_PASSWORD};Pooling=true;Maximum Pool Size=50"
+      Db__SnowflakeWorkerId: "1"
+      Jwt__SecretKey: ${PANSHI_JWT_SECRET:?PANSHI_JWT_SECRET 未设置，请复制 .env.example 为 .env（openssl rand -hex 32）}
+      TZ: Asia/Shanghai
+    ports:
+      - "18080:8080"   # 主机端口 18080（避免与本机其他 8080 服务冲突）；容器内仍 8080
+    volumes:
+      - ./backups:/backups
+      - ./data/uploads:/app/uploads
+      - ./logs:/app/logs
+
+volumes:
+  db-data:
