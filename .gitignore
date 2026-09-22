@@ -1,0 +1,11 @@
+**/bin/
+**/obj/
+**/node_modules/
+**/dist/
+**/.vs/
+**/*.user
+logs/
+uploads/
+backups/
+data/
+.env

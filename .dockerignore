@@ -1,0 +1,9 @@
+src/**/bin
+src/**/obj
+tests
+web/node_modules
+web/dist
+logs
+backups
+data
+.git
