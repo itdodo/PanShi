@@ -52,19 +52,42 @@ public class DataScopeService(
         return new ScopeCtx(userId, user.DeptId, scope, deptIds);
     }
 
-    /// <summary>构建过滤表达式（ctx=null 恒真）。只允许常量比较，满足 SqlSugar 翻译。</summary>
+    /// <summary>
+    /// 构建过滤表达式（ctx=null 恒真）。只允许常量比较，满足 SqlSugar 翻译。
+    /// ⚠️ 必须用「具体实体属性」而非 IDataScope 接口成员构造表达式：泛型约束 T : IDataScope 下
+    /// `it => it.OwnerUserId` 会绑定到接口属性，SqlSugar 取不到实体列映射 → 拼成 owneruserid(缺下划线) → PG 42703。
+    /// 故用 typeof(T).GetProperty(...) 显式指向实体属性。
+    /// </summary>
     public static Expression<Func<T, bool>> Filter<T>(ScopeCtx? ctx) where T : IDataScope
     {
         if (ctx is null) return _ => true;
 
-        return ctx.Best switch
+        var it = Expression.Parameter(typeof(T), "it");
+        var owner = Expression.Property(it, typeof(T).GetProperty(nameof(IDataScope.OwnerUserId))!);
+        var dept = Expression.Property(it, typeof(T).GetProperty(nameof(IDataScope.DeptId))!);
+
+        var body = ctx.Best switch
         {
             // 无部门用户看不到「本部门/及以下/自定义」数据：用 -1 常量保证空集
-            DataScopeType.Dept => it => it.DeptId == (ctx.DeptId ?? -1),
-            DataScopeType.DeptAndChild => it => it.DeptId != null && ctx.DeptIds.Contains(it.DeptId.Value),
-            DataScopeType.Custom => it => it.DeptId != null && ctx.DeptIds.Contains(it.DeptId.Value),
-            _ => it => it.OwnerUserId == ctx.UserId
+            DataScopeType.Dept => EqNullable(dept, ctx.DeptId ?? -1),
+            DataScopeType.DeptAndChild => InDeptIds(dept, ctx.DeptIds),
+            DataScopeType.Custom => InDeptIds(dept, ctx.DeptIds),
+            _ => EqNullable(owner, ctx.UserId)
         };
+        return Expression.Lambda<Func<T, bool>>(body, it);
+    }
+
+    private static Expression EqNullable(MemberExpression prop, long value)
+        => Expression.Equal(prop, Expression.Constant(value, typeof(long?)));
+
+    private static Expression InDeptIds(MemberExpression deptProp, IReadOnlyList<long> ids)
+    {
+        var list = ids.ToList();
+        var contains = typeof(List<long>).GetMethod(nameof(List<long>.Contains))!;
+        var hasValue = Expression.Property(deptProp, "HasValue");
+        var value = Expression.Property(deptProp, "Value");
+        var call = Expression.Call(Expression.Constant(list, typeof(List<long>)), contains, value);
+        return Expression.AndAlso(hasValue, call);
     }
 
     /// <summary>部门及子孙（ancestors 链内存 BFS）。</summary>
