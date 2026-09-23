@@ -50,6 +50,7 @@ import {
   type FlowNodeDto
 } from '@/components/flowGraph'
 import { nodeTypeLabel } from '@/components/flowEnums'
+import FlowCanvas from '@/components/FlowCanvas.vue'
 
 /**
  * 流程定义 + 简版流程设计器（节点顺序列表编辑器，不做拖拽）。
@@ -377,6 +378,15 @@ const previewJson = computed(() => {
     return stringifyGraph(draftToGraph())
   } catch (err) {
     return errorText(err, '节点数据异常，无法生成 JSON')
+  }
+})
+
+/** 流程图预览用的图（编辑列表时实时反映） */
+const previewGraph = computed(() => {
+  try {
+    return draftToGraph()
+  } catch {
+    return { entry: 'start', nodes: [] }
   }
 })
 
@@ -733,6 +743,12 @@ onMounted(() => {
           <NAlert v-if="newVersionTip" type="warning" :bordered="false" class="flow-def__alert">
             本次基于 v{{ designer.baseVersion }} 复制节点，保存后生成 v{{ designer.baseVersion + 1 }} 新版本。
           </NAlert>
+
+          <NCollapse :default-expanded-names="['canvas']" class="flow-def__preview">
+            <NCollapseItem title="流程图预览（钉钉式，随编辑实时更新）" name="canvas">
+              <FlowCanvas :graph="previewGraph" />
+            </NCollapseItem>
+          </NCollapse>
 
           <NDivider title-placement="left" class="flow-def__divider">节点顺序（{{ nodes.length }} 个节点）</NDivider>
 
