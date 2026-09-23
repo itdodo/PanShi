@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed, h, reactive, ref } from 'vue'
 import dayjs from 'dayjs'
+import DOMPurify from 'dompurify'
 import {
-  NAlert,
   NButton,
   NCard,
   NDataTable,
@@ -27,6 +27,7 @@ import { usePageList } from '@/composables/usePageList'
 import { hasPerm } from '@/directives/permission'
 import { message } from '@/utils/feedback'
 import { formatDateTime } from '@/utils/format'
+import RichTextEditor from '@/components/RichTextEditor.vue'
 import { NOTICE_STATUS, NOTICE_STATUS_OPTIONS, NOTICE_TYPE_OPTIONS, noticeStatusTag, noticeTypeLabel, toNum } from '../_shared'
 
 /**
@@ -34,7 +35,7 @@ import { NOTICE_STATUS, NOTICE_STATUS_OPTIONS, NOTICE_TYPE_OPTIONS, noticeStatus
  * 后端 NoticeDto = { id, title, noticeType, content, status, publishTime, createByName, createTime, version }；
  * 新增 POST /sys/notice、编辑 PUT /sys/notice/{id}（必带 version）、删除 DELETE /sys/notice/{id}。
  * 定时档校验「发布时间必须晚于当前时间」（后端 NoticeService 同规则兜底），到期由 sys.notice.publish 作业置为已发布。
- * 正文本批次用 textarea 直填 HTML，富文本编辑器（wangEditor）批次 #12 后段接入。
+ * 正文用 wangEditor 富文本（红线 #10：弹层 after-enter 后才挂载编辑器）；详情渲染前经 DOMPurify 净化防 XSS。
  */
 type NoticeRow = {
   id: string
@@ -67,6 +68,8 @@ const list = usePageList<NoticeRow, NoticeQueryModel>({
 })
 
 const modalVisible = ref(false)
+/** 红线 #10：富文本编辑器仅在弹层动画结束后挂载（可见容器内初始化） */
+const modalReady = ref(false)
 const saving = ref(false)
 const editing = computed(() => !!form.id)
 const isScheduled = computed(() => form.status === NOTICE_STATUS.Scheduled)
@@ -105,6 +108,7 @@ function resetForm(): void {
   form.status = NOTICE_STATUS.Stopped
   form.publishTime = null
   form.version = 0
+  modalReady.value = false
 }
 
 function openCreate(): void {
@@ -164,6 +168,9 @@ async function remove(row: NoticeRow): Promise<void> {
 /** 详情查看（正文 HTML 只以纯文本摘要呈现，避免未净化内容注入） */
 const detailVisible = ref(false)
 const detail = ref<NoticeRow | null>(null)
+
+/** 详情正文：wangEditor 产出 HTML，渲染前用 DOMPurify 净化，防 XSS 注入 */
+const sanitizedDetail = computed(() => DOMPurify.sanitize(detail.value?.content ?? ''))
 
 function openDetail(row: NoticeRow): void {
   detail.value = row
@@ -290,12 +297,9 @@ const columns = computed<DataTableColumns<NoticeRow>>(() => [
       style="width: 720px"
       :positive-button-props="{ loading: saving }"
       @positive-click="submit"
+      @after-enter="modalReady = true"
       @after-leave="resetForm"
     >
-      <NAlert type="warning" :bordered="false" style="margin-bottom: 12px">
-        正文暂以 HTML 源码录入（当前批次轻量方案）：可直接写 &lt;p&gt;/&lt;strong&gt;/&lt;ul&gt; 等标签，
-        富文本编辑器（wangEditor 可视化 + 粘贴净化）在批次 #12 后段接入本页，届时仅替换本输入框。
-      </NAlert>
       <NForm ref="formRef" :model="form" :rules="rules" label-placement="left" label-width="76">
         <NFormItem label="标题" path="title">
           <NInput v-model:value="form.title" maxlength="256" show-count placeholder="公告标题" />
@@ -329,14 +333,7 @@ const columns = computed<DataTableColumns<NoticeRow>>(() => [
           </span>
         </NFormItem>
         <NFormItem label="正文" path="content">
-          <NInput
-            v-model:value="form.content"
-            type="textarea"
-            :rows="9"
-            maxlength="65535"
-            placeholder="<p>正文 HTML…</p>"
-            style="font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px"
-          />
+          <RichTextEditor v-if="modalReady" v-model="form.content" :min-height="260" />
         </NFormItem>
       </NForm>
     </NModal>
@@ -359,7 +356,8 @@ const columns = computed<DataTableColumns<NoticeRow>>(() => [
           <span class="ps-muted">发布人：{{ detail.createByName ?? '-' }}</span>
           <span class="ps-muted">发布时间：{{ formatDateTime(detail.publishTime) }}</span>
         </NSpace>
-        <div class="ps-notice-detail__body">{{ detail.content || '（无正文）' }}</div>
+        <div v-if="detail.content" class="ps-notice-detail__body ps-rich-content" v-html="sanitizedDetail"></div>
+        <div v-else class="ps-notice-detail__body ps-muted">（无正文）</div>
       </div>
     </NModal>
   </div>
@@ -378,15 +376,35 @@ const columns = computed<DataTableColumns<NoticeRow>>(() => [
 }
 
 .ps-notice-detail__body {
-  max-height: 320px;
+  max-height: 360px;
   overflow-y: auto;
-  white-space: pre-wrap;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 12px;
   line-height: 1.8;
-  color: var(--ps-text-3);
-  border: 1px dashed rgba(100, 108, 136, 0.24);
+  font-size: 14px;
+  border: 1px solid var(--ps-card-border);
   border-radius: 8px;
-  padding: 10px 12px;
+  padding: 12px 14px;
+}
+
+/* wangEditor 产出的富文本正文排版 */
+.ps-rich-content :deep(p) {
+  margin: 0 0 10px;
+}
+
+.ps-rich-content :deep(ul),
+.ps-rich-content :deep(ol) {
+  margin: 0 0 10px;
+  padding-left: 22px;
+}
+
+.ps-rich-content :deep(img) {
+  max-width: 100%;
+  border-radius: 6px;
+}
+
+.ps-rich-content :deep(blockquote) {
+  margin: 0 0 10px;
+  padding: 6px 12px;
+  border-left: 3px solid var(--ps-primary);
+  color: var(--ps-text-3);
 }
 </style>
