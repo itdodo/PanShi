@@ -71,7 +71,7 @@ function onExpand(keys: Array<string | number>): void {
 
 <template>
   <NConfigProvider :theme="darkTheme" :theme-overrides="siderOverrides">
-    <div class="ps-side" :style="{ width: `${siderWidth}px` }">
+    <div class="ps-side" :class="{ 'ps-side--collapsed': props.collapsed }" :style="{ width: `${siderWidth}px` }">
       <div class="ps-side__brand">
         <span class="ps-side__logo"><icon-lucide-hexagon /></span>
         <span v-show="!props.collapsed" class="ps-side__title ps-ellipsis">磐石管理底座</span>
@@ -145,6 +145,22 @@ function onExpand(keys: Array<string | number>): void {
   overflow-x: hidden;
   overflow-y: auto;
   padding: 8px 6px;
+}
+
+/* 收起态：一级菜单图标水平居中（Naive 折叠项默认有左偏，去掉容器左右内边距并强制居中） */
+.ps-side--collapsed .ps-side__menu {
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.ps-side--collapsed :deep(.n-menu-item-content) {
+  justify-content: center;
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.ps-side--collapsed :deep(.n-menu-item-content__icon) {
+  margin-right: 0;
 }
 
 .ps-side__foot {
