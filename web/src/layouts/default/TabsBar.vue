@@ -25,8 +25,8 @@ function activate(raw: string | number): void {
   if (hit.fullPath !== route.fullPath) void router.push(hit.fullPath)
 }
 
-function closeTab(path: string): void {
-  const next = tabs.close(path)
+function closeTab(raw: string | number): void {
+  const next = tabs.close(String(raw))
   if (next) void router.push(next)
 }
 
@@ -54,13 +54,13 @@ function onAction(key: string | number): void {
       :animated="false"
       class="ps-tabs__strip"
       @update:value="activate"
+      @close="closeTab"
     >
       <NTabPane
         v-for="item in items"
         :key="item.path"
         :name="item.path"
         :closable="item.closable"
-        @close="closeTab(item.path)"
       >
         <template #tab>
           <span class="ps-tabs__label">{{ item.title }}</span>

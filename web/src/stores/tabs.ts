@@ -3,6 +3,8 @@ import { defineStore } from 'pinia'
 import type { RouteLocationNormalized } from 'vue-router'
 
 const STORAGE_KEY = 'ps:tabs'
+/** 首页（仪表盘）固定不可关闭；按路由 path 判定，而非「谁先入栈」 */
+const HOME_PATH = '/dashboard'
 
 export interface TabItem {
   /** 路由 name */
@@ -29,7 +31,11 @@ function restore(): StoreSnapshot {
     const raw = sessionStorage.getItem(STORAGE_KEY)
     if (!raw) return { tabs: [], activePath: '' }
     const parsed = JSON.parse(raw) as StoreSnapshot
-    const tabs = Array.isArray(parsed.tabs) ? parsed.tabs.filter((t) => !!t && !!t.path && !!t.name) : []
+    const tabs = Array.isArray(parsed.tabs)
+      ? parsed.tabs
+          .filter((t) => !!t && !!t.path && !!t.name)
+          .map((t) => ({ ...t, closable: t.path !== HOME_PATH })) // closable 一律按 path 归一，修正历史脏数据
+      : []
     return { tabs, activePath: typeof parsed.activePath === 'string' ? parsed.activePath : '' }
   } catch {
     return { tabs: [], activePath: '' }
@@ -88,8 +94,8 @@ export const useTabsStore = defineStore('tabs', () => {
       fullPath: route.fullPath,
       title,
       icon: route.meta.icon,
-      // 第一个页签（首页）固定不可关闭
-      closable: tabs.value.length > 0,
+      // 首页不可关闭，其余页签一律可关（修复：深链/刷新使非首页成为「首个」时被误锁）
+      closable: route.path !== HOME_PATH,
       keepAlive: route.meta.keepAlive !== false,
       cachedName: route.meta.cachedName ?? String(route.name ?? '')
     }
