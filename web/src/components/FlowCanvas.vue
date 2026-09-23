@@ -4,14 +4,22 @@ import type { FlowGraphDto } from './flowGraph'
 import { buildFlowTree } from './flowTree'
 import FlowTrack from './FlowTrack.vue'
 
-/** 只读流程图：把 FlowGraph DSL 渲染成钉钉式纵向树。highlight=当前节点 code（实例/待办页高亮用）。 */
-const props = defineProps<{ graph: FlowGraphDto; highlight?: string }>()
+/** 流程图：把 FlowGraph DSL 渲染成钉钉式纵向树。highlight=高亮节点；editable=可点选/插入。 */
+const props = defineProps<{ graph: FlowGraphDto; highlight?: string; editable?: boolean; selected?: string | null }>()
+defineEmits<{ select: [code: string]; insert: [afterCode: string, type: string] }>()
 const tree = computed(() => buildFlowTree(props.graph))
 </script>
 
 <template>
   <div class="fc">
-    <FlowTrack :track="tree.track" :highlight="props.highlight" />
+    <FlowTrack
+      :track="tree.track"
+      :highlight="props.highlight"
+      :editable="props.editable"
+      :selected="props.selected"
+      @select="(code: string) => $emit('select', code)"
+      @insert="(code: string, type: string) => $emit('insert', code, type)"
+    />
   </div>
 </template>
 

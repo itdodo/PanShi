@@ -191,6 +191,9 @@ const nodes = ref<DraftNode[]>([])
 const saving = ref(false)
 const previewExpanded = ref<string[]>([])
 const newVersionTip = ref(false)
+/** 画布编辑：当前选中节点 key + 配置抽屉可见 */
+const selectedKey = ref<number | null>(null)
+const configShow = ref(false)
 
 const userOpts = ref<SelectOption[]>([])
 const roleOpts = ref<SelectOption[]>([])
@@ -489,6 +492,50 @@ function onTypeChange(node: DraftNode, type: string): void {
   }
 }
 
+/* ------------------------------ 画布编辑（选择/插入/删除） ------------------------------ */
+const selectedNode = computed<DraftNode | null>(() => nodes.value.find((n) => n.key === selectedKey.value) ?? null)
+const selectedCode = computed<string | null>(() => selectedNode.value?.code ?? null)
+const canDeleteNode = computed(() => !!selectedNode.value && !isFixed(selectedNode.value))
+
+function selectNode(code: string): void {
+  const node = nodes.value.find((n) => n.code === code)
+  if (!node) return
+  selectedKey.value = node.key
+  configShow.value = true
+}
+
+/** 在某线性节点之后插入新节点：新节点接管其后继，原节点指向新节点 */
+function insertAfter(afterCode: string, type: string): void {
+  const target = nodes.value.find((n) => n.code === afterCode)
+  if (!target) return
+  const code = shortCode()
+  const node: DraftNode = {
+    key: nextKey(),
+    code,
+    type,
+    name: `${nodeTypeLabel(type)}节点`,
+    mode: type === 'approval' ? 'orSign' : '',
+    next: type === 'condition' ? '' : target.next || 'end',
+    defaultNext: type === 'condition' ? 'end' : '',
+    approvers: type === 'approval' ? [newApprover()] : [],
+    branches: type === 'condition' ? [newBranch('end')] : [],
+    ccUserIds: []
+  }
+  target.next = code
+  const idx = nodes.value.findIndex((n) => n.key === target.key)
+  nodes.value.splice(idx + 1, 0, node)
+  selectedKey.value = node.key
+  configShow.value = true
+}
+
+function removeSelected(): void {
+  const node = selectedNode.value
+  if (!node || isFixed(node)) return
+  removeNode(node)
+  configShow.value = false
+  selectedKey.value = null
+}
+
 /* ---------------------------------- 打开/保存 --------------------------------- */
 function openCreate(): void {
   designer.show = true
@@ -744,13 +791,17 @@ onMounted(() => {
             本次基于 v{{ designer.baseVersion }} 复制节点，保存后生成 v{{ designer.baseVersion + 1 }} 新版本。
           </NAlert>
 
-          <NCollapse :default-expanded-names="['canvas']" class="flow-def__preview">
-            <NCollapseItem title="流程图预览（钉钉式，随编辑实时更新）" name="canvas">
-              <FlowCanvas :graph="previewGraph" />
-            </NCollapseItem>
-          </NCollapse>
+          <NDivider title-placement="left" class="flow-def__divider">流程画布（{{ nodes.length }} 节点 · 点卡片配置 · ＋插入）</NDivider>
+          <FlowCanvas
+            editable
+            :graph="previewGraph"
+            :selected="selectedCode"
+            @select="selectNode"
+            @insert="insertAfter"
+          />
 
-          <NDivider title-placement="left" class="flow-def__divider">节点顺序（{{ nodes.length }} 个节点）</NDivider>
+          <NCollapse :default-expanded-names="[]" class="flow-def__preview">
+            <NCollapseItem title="高级：逐节点顺序编辑（上移/下移/接线）" name="adv">
 
           <div v-for="(node, index) in nodes" :key="node.key" class="flow-def__node">
             <div class="flow-def__node-head">
@@ -959,6 +1010,8 @@ onMounted(() => {
             <NButton size="small" dashed @click="addNode('condition')">+ 条件分支</NButton>
             <NButton size="small" dashed @click="addNode('cc')">+ 抄送节点</NButton>
           </NSpace>
+            </NCollapseItem>
+          </NCollapse>
 
           <NCollapse v-model:expanded-names="previewExpanded" class="flow-def__preview">
             <NCollapseItem title="保存前预览 nodeJson" name="json">
@@ -981,6 +1034,146 @@ onMounted(() => {
             >
               保存{{ designer.mode === 'create' ? '（新流程）' : '（新版本）' }}
             </NButton>
+          </NSpace>
+        </template>
+      </NDrawerContent>
+    </NDrawer>
+
+    <NDrawer v-model:show="configShow" :width="560" placement="right">
+      <NDrawerContent closable :title="selectedNode ? `配置节点 · ${selectedNode.name || selectedNode.code}` : '配置节点'">
+        <NScrollbar v-if="selectedNode" class="flow-def__scroll">
+          <NForm label-placement="left" label-width="82" size="small">
+            <NFormItem label="节点类型">
+              <NSelect
+                :value="selectedNode.type"
+                :options="TYPE_CHOICES"
+                :disabled="isFixed(selectedNode)"
+                style="width: 160px"
+                @update:value="(value: string) => onTypeChange(selectedNode!, value)"
+              />
+            </NFormItem>
+            <NFormItem label="节点编码">
+              <NInput
+                v-model:value="selectedNode.code"
+                :disabled="selectedNode.type === 'start' || selectedNode.type === 'end'"
+                placeholder="唯一编码"
+                @focus="rememberCode(selectedNode)"
+                @blur="applyCode(selectedNode)"
+              />
+            </NFormItem>
+            <NFormItem label="节点名称">
+              <NInput v-model:value="selectedNode.name" maxlength="64" placeholder="显示名称" />
+            </NFormItem>
+            <NFormItem v-if="selectedNode.type === 'approval'" label="审批模式">
+              <NSelect
+                v-model:value="selectedNode.mode"
+                :options="[
+                  { label: '或签', value: 'orSign' },
+                  { label: '会签', value: 'countersign' },
+                  { label: '依次审批', value: 'sequential' }
+                ]"
+                style="width: 160px"
+              />
+            </NFormItem>
+            <NFormItem v-if="selectedNode.type !== 'end' && selectedNode.type !== 'condition'" label="下一节点">
+              <NSelect
+                v-model:value="selectedNode.next"
+                :options="codeOptions.filter((o) => o.value !== selectedNode!.code)"
+                clearable
+                placeholder="留空 = 结束"
+                style="width: 240px"
+              />
+            </NFormItem>
+            <NFormItem v-if="selectedNode.type === 'condition'" label="默认走向">
+              <NSelect
+                v-model:value="selectedNode.defaultNext"
+                :options="codeOptions.filter((o) => o.value !== selectedNode!.code)"
+                clearable
+                placeholder="可空 = 直接结束"
+                style="width: 240px"
+              />
+            </NFormItem>
+          </NForm>
+
+          <!-- 审批人规则 -->
+          <template v-if="selectedNode.type === 'approval'">
+            <NDivider title-placement="left">审批人规则（多规则取并集）</NDivider>
+            <div v-for="(approver, ai) in selectedNode.approvers" :key="ai" class="flow-def__approver">
+              <span class="ps-muted">规则{{ ai + 1 }}</span>
+              <NSelect v-model:value="approver.type" :options="APPROVER_CHOICES" size="small" style="width: 128px" />
+              <NSelect
+                v-if="approver.type === 'user' || approver.type === 'submitterChoice'"
+                v-model:value="approver.userIds"
+                :options="userOpts"
+                multiple
+                filterable
+                size="small"
+                :disabled="approver.type === 'submitterChoice'"
+                :placeholder="approver.type === 'submitterChoice' ? '发起人提交时自选' : '选择人员'"
+                style="flex: 1 1 220px"
+              />
+              <NSelect
+                v-else-if="approver.type === 'role'"
+                v-model:value="approver.codes"
+                :options="roleOpts"
+                multiple
+                filterable
+                size="small"
+                placeholder="选择角色"
+                style="flex: 1 1 220px"
+              />
+              <template v-else-if="approver.type === 'position'">
+                <NSelect v-model:value="approver.codes" :options="positionOpts" multiple filterable size="small" placeholder="选择岗位" style="flex: 1 1 180px" />
+                <NSelect v-model:value="approver.scope" :options="SCOPE_CHOICES" size="small" style="width: 136px" />
+              </template>
+              <NInputNumber
+                v-else-if="approver.type === 'deptLeader'"
+                v-model:value="approver.deptId"
+                size="small"
+                :show-button="false"
+                placeholder="部门 id（留空逐级上找）"
+                style="flex: 1 1 200px"
+              />
+              <NButton size="tiny" quaternary type="error" :disabled="selectedNode.approvers.length <= 1" @click="selectedNode.approvers.splice(ai, 1)">
+                移除
+              </NButton>
+            </div>
+            <NButton size="tiny" dashed @click="selectedNode.approvers.push(newApprover())">+ 添加审批人规则</NButton>
+          </template>
+
+          <!-- 抄送 -->
+          <NFormItem v-else-if="selectedNode.type === 'cc'" label="抄送人员" style="margin-top: 8px">
+            <NSelect v-model:value="selectedNode.ccUserIds" :options="userOpts" multiple filterable size="small" placeholder="抄送人员" style="width: 100%" />
+          </NFormItem>
+
+          <!-- 条件分支 -->
+          <template v-else-if="selectedNode.type === 'condition'">
+            <NDivider title-placement="left">条件分支</NDivider>
+            <NCollapse :default-expanded-names="selectedNode.branches.map((_, i) => String(i))">
+              <NCollapseItem v-for="(branch, bi) in selectedNode.branches" :key="bi" :title="`分支 ${bi + 1}：${branch.name || '未命名'}`" :name="String(bi)">
+                <div class="flow-def__branch-line">
+                  <NInput v-model:value="branch.name" size="small" placeholder="分支名称" style="width: 140px" />
+                  <NInputNumber v-model:value="branch.priority" size="small" :show-button="false" placeholder="优先级" style="width: 90px" />
+                  <NSelect v-model:value="branch.next" :options="codeOptions.filter((o) => o.value !== selectedNode!.code)" size="small" placeholder="命中后走向" style="width: 180px" />
+                  <NButton size="tiny" quaternary type="error" :disabled="selectedNode.branches.length <= 1" @click="selectedNode.branches.splice(bi, 1)">移除分支</NButton>
+                </div>
+                <div v-for="(cond, ci) in branch.conditions" :key="ci" class="flow-def__cond">
+                  <NInput v-model:value="cond.variable" size="small" placeholder="变量（如 amount）" style="width: 140px" />
+                  <NSelect v-model:value="cond.op" :options="OP_CHOICES" size="small" style="width: 140px" />
+                  <NInput v-model:value="cond.value" size="small" :placeholder="cond.op === 'in' ? '多值逗号分隔' : '比较值'" style="flex: 1 1 140px" />
+                  <NButton size="tiny" quaternary type="error" :disabled="branch.conditions.length <= 1" @click="branch.conditions.splice(ci, 1)">删条件</NButton>
+                </div>
+                <NButton size="tiny" dashed @click="branch.conditions.push({ variable: '', op: 'eq', value: '' })">+ 添加条件</NButton>
+              </NCollapseItem>
+            </NCollapse>
+            <NButton size="tiny" dashed class="flow-def__add-branch" @click="selectedNode.branches.push(newBranch(selectedNode.defaultNext))">+ 添加分支</NButton>
+          </template>
+        </NScrollbar>
+
+        <template #footer>
+          <NSpace justify="space-between">
+            <NButton type="error" tertiary :disabled="!canDeleteNode" @click="removeSelected">删除该节点</NButton>
+            <NButton type="primary" @click="configShow = false">完成</NButton>
           </NSpace>
         </template>
       </NDrawerContent>
