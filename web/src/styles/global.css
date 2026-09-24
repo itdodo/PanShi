@@ -141,3 +141,44 @@ a {
   border: 1px solid var(--ps-card-border);
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
 }
+
+/* —— 树形表格父子展开开关（菜单/部门等）：把 Naive 默认的裸小箭头重做成圆角方钮 ——
+   箭头旋转在内层 .n-base-icon 上，外层钮只做描边/悬停反馈，故自身不转。
+   用 .ps-tree-table 前缀把特异性提到 (0,2,0)，压过 Naive 运行时 CSS，免用 !important；
+   占位符同宽，保证有子/无子两行的内容列水平对齐。 */
+.ps-tree-table .n-data-table-expand-trigger,
+.ps-tree-table .n-data-table-expand-placeholder {
+  width: 20px;
+  height: 20px;
+  margin-right: 8px;
+  flex: 0 0 auto;
+}
+
+.ps-tree-table .n-data-table-expand-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--ps-card-border);
+  border-radius: 6px;
+  background: var(--ps-tab-hover);
+  color: var(--ps-text-3, #9ca3af);
+  cursor: pointer;
+  transition:
+    color 0.16s ease,
+    border-color 0.16s ease,
+    background 0.16s ease;
+}
+
+.ps-tree-table .n-data-table-expand-trigger:hover {
+  color: var(--ps-primary);
+  border-color: var(--ps-primary);
+  background: var(--ps-primary-soft);
+}
+
+.ps-tree-table .n-data-table-expand-trigger .n-base-icon,
+.ps-tree-table .n-data-table-expand-trigger .n-base-icon svg {
+  width: 12px;
+  height: 12px;
+  font-size: 12px;
+}
+

@@ -285,7 +285,7 @@ onMounted(() => {
       </NSpace>
 
       <NDataTable
-        class="ps-dept-table"
+        class="ps-dept-table ps-tree-table"
         :columns="columns"
         :data="tableData"
         :loading="loading"

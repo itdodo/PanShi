@@ -364,7 +364,7 @@ onMounted(() => {
       </NAlert>
 
       <NDataTable
-        class="ps-menu-table"
+        class="ps-menu-table ps-tree-table"
         :columns="columns"
         :data="tableData"
         :loading="loading"
