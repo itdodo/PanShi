@@ -81,7 +81,15 @@ router.beforeEach(async (to) => {
 
 router.afterEach((to) => {
   const tabs = useTabsStore()
-  if (to.matched.some((r) => r.name === 'Layout')) tabs.addTab(to)
+  if (to.matched.some((r) => r.name === 'Layout')) {
+    // 登录重定向到指定子页时首页不会自然入栈——先兜底把首页页签置顶，再入栈当前页
+    const perm = usePermissionStore()
+    if (perm.loaded) {
+      // resolve() 运行时返回规范化位置，但类型为 RouteLocationResolvedGeneric（matched 偏松），故断言
+      tabs.ensureHome(router.resolve(perm.homePath) as unknown as typeof to)
+    }
+    tabs.addTab(to)
+  }
   const title = to.meta.title
   document.title = title ? `${title} · ${APP_TITLE}` : APP_TITLE
 })
