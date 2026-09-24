@@ -152,6 +152,21 @@ a {
   height: 20px;
   margin-right: 8px;
   flex: 0 0 auto;
+  vertical-align: middle;
+}
+
+/* 首列里「缩进 + 展开钮 + 名称」本是 td 的直接子节点平铺：前两者行内、名称却是块级 .ps-row，
+   于是名称另起一行(展开钮孤悬其上方)、且各层级名称都从单元格左缘起排 → 缩进丢失、看不出父子。
+   名称改 inline-flex + 统一 vertical-align:middle，三者即同行排列并按层级缩进。 */
+.ps-tree-table td .ps-row {
+  display: inline-flex;
+  vertical-align: middle;
+}
+
+/* 每级 16px 缩进槽画一条浅色竖向引导线，父子层级一眼可辨 */
+.ps-tree-table .n-data-table-indent {
+  border-left: 1px solid var(--ps-card-border);
+  vertical-align: middle;
 }
 
 .ps-tree-table .n-data-table-expand-trigger {
