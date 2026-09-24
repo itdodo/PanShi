@@ -3,19 +3,19 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import {
   NButton,
   NCard,
+  NDrawer,
+  NDrawerContent,
   NEmpty,
   NForm,
   NFormItem,
   NInput,
-  NList,
-  NListItem,
   NPopconfirm,
   NRadioButton,
   NRadioGroup,
+  NSelect,
   NSpace,
   NSpin,
   NTag,
-  NTooltip,
   type FormInst,
   type FormRules,
   type SelectOption
@@ -27,73 +27,10 @@ import { message } from '@/utils/feedback'
 import { formatDateTime, fromNow } from '@/utils/format'
 
 /**
- * 消息中心（/sys/message）：上「发送站内信」（sys:message:send），下「我的收件箱」（登录即可）。
+ * 消息中心（/sys/message）：收件箱为主体，「写消息」走右侧发送抽屉，点消息行就地展开阅读并标已读。
  * 收件箱接口为静默调用（api/notice 里 silent:true），后端未就绪时列表为空不弹错。
  */
 const notice = useNoticeStore()
-
-/* ------------------------------- 发送表单 ------------------------------- */
-const sendFormRef = ref<FormInst | null>(null)
-const sending = ref(false)
-const optionsLoading = ref(false)
-const receiverOptions = ref<SelectOption[]>([])
-
-const sendModel = reactive<{ receiverIds: number[]; title: string; content: string }>({
-  receiverIds: [],
-  title: '',
-  content: ''
-})
-
-const sendRules: FormRules = {
-  receiverIds: [{ type: 'array', required: true, message: '请至少选择一位接收人', trigger: ['change', 'blur'] }],
-  title: [
-    { required: true, message: '请输入标题', trigger: ['input', 'blur'] },
-    { max: 128, message: '标题不超过 128 字', trigger: ['input', 'blur'] }
-  ]
-}
-
-async function loadOptions(): Promise<void> {
-  optionsLoading.value = true
-  try {
-    const list = await userOptions()
-    // 契约：MessageSendDto.ReceiverIds 是 List<long>，故值必须转 Number
-    receiverOptions.value = (list ?? []).map((it) => ({
-      label: it.label || it.value,
-      value: Number(it.value)
-    }))
-  } catch {
-    receiverOptions.value = []
-  } finally {
-    optionsLoading.value = false
-  }
-}
-
-function resetSendForm(): void {
-  sendModel.receiverIds = []
-  sendModel.title = ''
-  sendModel.content = ''
-  sendFormRef.value?.restoreValidation()
-}
-
-async function doSend(): Promise<void> {
-  const invalid = await sendFormRef.value?.validate().then(() => false).catch(() => true)
-  if (invalid) return
-  sending.value = true
-  try {
-    await sendMessage({
-      receiverIds: sendModel.receiverIds.map((v) => Number(v)),
-      title: sendModel.title.trim(),
-      content: sendModel.content.trim() || undefined
-    })
-    message.success(`已发送给 ${sendModel.receiverIds.length} 位接收人`)
-    resetSendForm()
-    await Promise.allSettled([notice.refreshCount(), loadInbox(true)])
-  } catch {
-    /* 拦截器已提示 */
-  } finally {
-    sending.value = false
-  }
-}
 
 /* ------------------------------- 我的收件箱 ------------------------------- */
 type ReadFilter = 'all' | 'unread' | 'read'
@@ -107,6 +44,8 @@ const pageNum = ref(1)
 const inboxLoading = ref(false)
 const loadingMore = ref(false)
 const marking = ref(false)
+/** 就地展开阅读的消息 id（同时是标已读的触发） */
+const selectedId = ref<string | null>(null)
 
 const isReadParam = (f: ReadFilter): boolean | undefined => (f === 'all' ? undefined : f === 'read')
 
@@ -153,10 +92,12 @@ async function loadMore(): Promise<void> {
 
 async function onFilterChange(value: string | number | boolean): Promise<void> {
   filter.value = value as ReadFilter
+  selectedId.value = null
   await loadInbox()
 }
 
-async function openMessage(item: MessageDto): Promise<void> {
+async function toggleOpen(item: MessageDto): Promise<void> {
+  selectedId.value = selectedId.value === item.id ? null : item.id
   if (item.isRead) return
   try {
     await markMessageRead(item.id)
@@ -173,6 +114,7 @@ async function onReadAll(): Promise<void> {
   try {
     await markAllRead()
     message.success('已全部标记为已读')
+    selectedId.value = null
     await Promise.allSettled([loadInbox(true), notice.refreshCount()])
   } catch {
     /* 拦截器/静默处理 */
@@ -192,6 +134,76 @@ function msgTypeTag(msgType: number | string | undefined): { label: string; type
   return MSG_TYPE_MAP[Number(key)] ?? { label: '消息', type: 'info' }
 }
 
+/* ------------------------------- 发送抽屉 ------------------------------- */
+const drawerVisible = ref(false)
+const sendFormRef = ref<FormInst | null>(null)
+const sending = ref(false)
+const optionsLoading = ref(false)
+const receiverOptions = ref<SelectOption[]>([])
+
+const sendModel = reactive<{ receiverIds: number[]; title: string; content: string }>({
+  receiverIds: [],
+  title: '',
+  content: ''
+})
+
+const sendRules: FormRules = {
+  receiverIds: [{ type: 'array', required: true, message: '请至少选择一位接收人', trigger: ['change', 'blur'] }],
+  title: [
+    { required: true, message: '请输入标题', trigger: ['input', 'blur'] },
+    { max: 128, message: '标题不超过 128 字', trigger: ['input', 'blur'] }
+  ]
+}
+
+async function loadOptions(): Promise<void> {
+  optionsLoading.value = true
+  try {
+    const list = await userOptions()
+    // 契约：MessageSendDto.ReceiverIds 是 List<long>，故值必须转 Number
+    receiverOptions.value = (list ?? []).map((it) => ({
+      label: it.label || it.value,
+      value: Number(it.value)
+    }))
+  } catch {
+    receiverOptions.value = []
+  } finally {
+    optionsLoading.value = false
+  }
+}
+
+function openSend(): void {
+  drawerVisible.value = true
+  if (!receiverOptions.value.length) void loadOptions()
+}
+
+function resetSendForm(): void {
+  sendModel.receiverIds = []
+  sendModel.title = ''
+  sendModel.content = ''
+  sendFormRef.value?.restoreValidation()
+}
+
+async function doSend(): Promise<void> {
+  const invalid = await sendFormRef.value?.validate().then(() => false).catch(() => true)
+  if (invalid) return
+  sending.value = true
+  try {
+    await sendMessage({
+      receiverIds: sendModel.receiverIds.map((v) => Number(v)),
+      title: sendModel.title.trim(),
+      content: sendModel.content.trim() || undefined
+    })
+    message.success(`已发送给 ${sendModel.receiverIds.length} 位接收人`)
+    resetSendForm()
+    drawerVisible.value = false
+    await Promise.allSettled([notice.refreshCount(), loadInbox(true)])
+  } catch {
+    /* 拦截器已提示 */
+  } finally {
+    sending.value = false
+  }
+}
+
 onMounted(() => {
   void loadOptions()
   void loadInbox()
@@ -201,63 +213,11 @@ onMounted(() => {
 
 <template>
   <div class="ps-page">
-    <NCard :bordered="false" title="发送站内信" class="ps-message__card">
-      <NForm
-        ref="sendFormRef"
-        :model="sendModel"
-        :rules="sendRules"
-        label-placement="left"
-        label-width="88"
-        class="ps-message__form"
-      >
-        <NFormItem label="接收人" path="receiverIds">
-          <NSelect
-            v-model:value="sendModel.receiverIds"
-            multiple
-            filterable
-            clearable
-            :options="receiverOptions"
-            :loading="optionsLoading"
-            max-tag-count="responsive"
-            placeholder="搜索并选择接收人（可多选）"
-          />
-        </NFormItem>
-        <NFormItem label="标题" path="title">
-          <NInput v-model:value="sendModel.title" maxlength="128" show-count clearable placeholder="一句话说明来意" />
-        </NFormItem>
-        <NFormItem label="内容" path="content">
-          <NInput
-            v-model:value="sendModel.content"
-            type="textarea"
-            :autosize="{ minRows: 4, maxRows: 10 }"
-            maxlength="2000"
-            show-count
-            placeholder="选填。接收方在顶栏铃铛与本页面收到，实时推送由 SignalR 负责。"
-          />
-        </NFormItem>
-        <NFormItem :show-label="false">
-          <NSpace :size="8">
-            <NButton
-              v-permission="'sys:message:send'"
-              type="primary"
-              :loading="sending"
-              :disabled="optionsLoading && !receiverOptions.length"
-              @click="doSend"
-            >
-              发送
-            </NButton>
-            <NButton tertiary @click="resetSendForm">清空</NButton>
-            <NButton tertiary :loading="optionsLoading" @click="loadOptions">重载接收人</NButton>
-          </NSpace>
-        </NFormItem>
-      </NForm>
-    </NCard>
-
     <NCard :bordered="false">
       <template #header>
-        <NSpace align="center" justify="space-between" :wrap="true">
+        <div class="ps-message__head">
           <NSpace align="center" :size="8">
-            <span>我的收件箱</span>
+            <span class="ps-message__head-title">我的收件箱</span>
             <NTag size="small" :bordered="false" type="warning">未读 {{ notice.unreadCount }}</NTag>
             <NTag size="small" :bordered="false">共 {{ total }} 条</NTag>
           </NSpace>
@@ -276,69 +236,141 @@ onMounted(() => {
               </template>
               确认把全部未读消息标记为已读？
             </NPopconfirm>
+            <NButton v-permission="'sys:message:send'" size="small" type="primary" @click="openSend">
+              <template #icon><icon-lucide-pen-square /></template>
+              写消息
+            </NButton>
           </NSpace>
-        </NSpace>
+        </div>
       </template>
 
       <NSpin :show="inboxLoading">
-        <NEmpty v-if="!inboxLoading && !rows.length" description="收件箱暂无消息" style="padding: 32px 0" />
-        <NList v-else hoverable clickable :bordered="false">
-          <NListItem v-for="item in rows" :key="item.id" @click="openMessage(item)">
-            <div class="ps-message__item">
-              <div class="ps-message__line">
-                <span v-if="!item.isRead" class="ps-message__dot" />
-                <span class="ps-message__title" :class="{ 'ps-message__title--unread': !item.isRead }">
-                  {{ item.title }}
-                </span>
-                <NTag size="small" :bordered="false" :type="msgTypeTag(item.msgType).type">
-                  {{ msgTypeTag(item.msgType).label }}
-                </NTag>
-                <NTag v-if="item.isRead" size="small" :bordered="false">已读</NTag>
-              </div>
-              <p v-if="item.content" class="ps-message__content">{{ item.content }}</p>
-              <div class="ps-message__time">
-                {{ item.senderName || '系统' }} · {{ fromNow(item.createTime) }}
-                <NTooltip trigger="hover">
-                  <template #trigger>
-                    <span class="ps-message__time-more">（{{ formatDateTime(item.createTime) }}）</span>
-                  </template>
-                  接收人本人可见；点击条目即标记已读
-                </NTooltip>
+        <NEmpty v-if="!inboxLoading && !rows.length" description="收件箱暂无消息" style="padding: 48px 0" />
+        <ul v-else class="ps-message__list">
+          <li v-for="item in rows" :key="item.id" class="ps-message__item" :class="{ 'ps-message__item--open': selectedId === item.id }">
+            <div class="ps-message__row" @click="toggleOpen(item)">
+              <span class="ps-message__dot" :class="{ 'ps-message__dot--hidden': item.isRead }" />
+              <span class="ps-message__title" :class="{ 'ps-message__title--unread': !item.isRead }">
+                {{ item.title }}
+              </span>
+              <span class="ps-message__meta">{{ item.senderName || '系统' }} · {{ fromNow(item.createTime) }}</span>
+              <NTag size="small" :bordered="false" :type="msgTypeTag(item.msgType).type">
+                {{ msgTypeTag(item.msgType).label }}
+              </NTag>
+              <icon-lucide-chevron-down class="ps-message__caret" :class="{ 'ps-message__caret--open': selectedId === item.id }" />
+            </div>
+            <div v-if="selectedId === item.id" class="ps-message__detail">
+              <p v-if="item.content" class="ps-message__detail-content">{{ item.content }}</p>
+              <p v-else class="ps-message__detail-content ps-message__detail-content--empty">（无正文）</p>
+              <div class="ps-message__detail-foot">
+                <span>{{ formatDateTime(item.createTime) }}</span>
+                <span v-if="item.readTime"> · 已读于 {{ formatDateTime(item.readTime) }}</span>
               </div>
             </div>
-          </NListItem>
-        </NList>
+          </li>
+        </ul>
       </NSpin>
 
-      <NSpace justify="center" class="ps-message__more">
+      <NSpace justify="center" align="center" class="ps-message__more">
         <NButton v-if="!finished" size="small" tertiary :loading="loadingMore" @click="loadMore">
           加载更多（已显示 {{ rows.length }}/{{ total }}）
         </NButton>
         <span v-else-if="rows.length" class="ps-muted">已显示全部 {{ rows.length }} 条</span>
       </NSpace>
     </NCard>
+
+    <NDrawer v-model:show="drawerVisible" :width="480" placement="right">
+      <NDrawerContent title="写消息" closable>
+        <NForm ref="sendFormRef" :model="sendModel" :rules="sendRules" label-placement="top">
+          <NFormItem label="接收人" path="receiverIds">
+            <NSelect
+              v-model:value="sendModel.receiverIds"
+              multiple
+              filterable
+              clearable
+              :options="receiverOptions"
+              :loading="optionsLoading"
+              max-tag-count="responsive"
+              placeholder="搜索并选择接收人（可多选）"
+            />
+          </NFormItem>
+          <NFormItem label="标题" path="title">
+            <NInput v-model:value="sendModel.title" maxlength="128" show-count clearable placeholder="一句话说明来意" />
+          </NFormItem>
+          <NFormItem label="内容" path="content">
+            <NInput
+              v-model:value="sendModel.content"
+              type="textarea"
+              :autosize="{ minRows: 6, maxRows: 14 }"
+              maxlength="2000"
+              show-count
+              placeholder="选填。接收方在顶栏铃铛与本页面收到，实时推送由 SignalR 负责。"
+            />
+          </NFormItem>
+        </NForm>
+        <template #footer>
+          <NSpace justify="end" :size="8">
+            <NButton tertiary @click="drawerVisible = false">取消</NButton>
+            <NButton
+              v-permission="'sys:message:send'"
+              type="primary"
+              :loading="sending"
+              :disabled="optionsLoading && !receiverOptions.length"
+              @click="doSend"
+            >
+              发送
+            </NButton>
+          </NSpace>
+        </template>
+      </NDrawerContent>
+    </NDrawer>
   </div>
 </template>
 
 <style scoped>
-.ps-message__card {
-  margin-bottom: 14px;
+.ps-message__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
-.ps-message__form {
-  max-width: 720px;
+.ps-message__head-title {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+/* —— 列表：整行可点，展开阅读 —— */
+.ps-message__list {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0;
 }
 
 .ps-message__item {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
+  border-radius: 10px;
+  transition: background 0.16s ease;
 }
 
-.ps-message__line {
+.ps-message__item + .ps-message__item {
+  margin-top: 2px;
+}
+
+.ps-message__item:hover {
+  background: var(--ps-tab-hover);
+}
+
+.ps-message__item--open {
+  background: var(--ps-tab-hover);
+}
+
+.ps-message__row {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
+  padding: 10px 12px;
+  cursor: pointer;
   min-width: 0;
 }
 
@@ -350,38 +382,71 @@ onMounted(() => {
   flex: none;
 }
 
+.ps-message__dot--hidden {
+  background: transparent;
+}
+
 .ps-message__title {
   font-size: 14px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  flex: 0 1 auto;
 }
 
 .ps-message__title--unread {
   font-weight: 650;
 }
 
-.ps-message__content {
-  margin: 0;
-  font-size: 13px;
+.ps-message__meta {
+  margin-left: auto;
+  flex: none;
+  font-size: 12px;
   color: var(--ps-text-3);
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+  white-space: nowrap;
 }
 
-.ps-message__time {
+.ps-message__caret {
+  width: 14px;
+  height: 14px;
+  flex: none;
+  color: var(--ps-text-3);
+  transform: rotate(-90deg);
+  transition: transform 0.18s ease;
+}
+
+.ps-message__caret--open {
+  transform: rotate(0deg);
+}
+
+.ps-message__detail {
+  padding: 0 12px 12px 29px;
+}
+
+.ps-message__detail-content {
+  margin: 0;
+  padding: 10px 12px;
+  font-size: 13px;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  word-break: break-word;
+  border: 1px solid var(--ps-card-border);
+  border-radius: 8px;
+  background: var(--ps-page-bg);
+}
+
+.ps-message__detail-content--empty {
+  color: var(--ps-text-3);
+}
+
+.ps-message__detail-foot {
+  margin-top: 6px;
   font-size: 12px;
   color: var(--ps-text-3);
 }
 
-.ps-message__time-more {
-  cursor: default;
-}
-
 .ps-message__more {
   margin-top: 12px;
+  min-height: 24px;
 }
 </style>
