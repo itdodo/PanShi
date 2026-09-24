@@ -6,6 +6,8 @@ import { catchAllRoute, isWhitePath, staticRoutes } from './routes'
 
 export const FORCE_CHANGE_PWD_PATH = '/force/change-password'
 export const APP_TITLE = '磐石管理底座'
+/** 记录因 chunk 加载失败已自动重载的目标，防同一目标反复重载 */
+const CHUNK_RELOAD_KEY = 'ps:chunk-reload'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -80,6 +82,7 @@ router.beforeEach(async (to) => {
 })
 
 router.afterEach((to) => {
+  sessionStorage.removeItem(CHUNK_RELOAD_KEY)
   const tabs = useTabsStore()
   if (to.matched.some((r) => r.name === 'Layout')) {
     // 登录重定向到指定子页时首页不会自然入栈——先兜底把首页页签置顶，再入栈当前页
@@ -92,6 +95,22 @@ router.afterEach((to) => {
   }
   const title = to.meta.title
   document.title = title ? `${title} · ${APP_TITLE}` : APP_TITLE
+})
+
+/**
+ * 部署后旧会话仍引用被替换掉的哈希 chunk：懒加载 import() 失败 → 页面空白报错。
+ * 捕获该失败并整页重载一次（拉取新入口 index.html + 新 chunk）；同一目标只重载一次，防死循环。
+ */
+const CHUNK_FAIL_RE =
+  /dynamically imported module|importing a module script failed|failed to fetch dynamically|loading chunk \S+ failed|unable to preload css/i
+
+router.onError((error, to) => {
+  const msg = String((error as { message?: string })?.message ?? error)
+  if (!CHUNK_FAIL_RE.test(msg)) return
+  const target = to?.fullPath || window.location.pathname + window.location.search
+  if (sessionStorage.getItem(CHUNK_RELOAD_KEY) === target) return
+  sessionStorage.setItem(CHUNK_RELOAD_KEY, target)
+  window.location.href = target
 })
 
 export default router
