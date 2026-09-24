@@ -53,6 +53,32 @@ type MenuFormModel = {
 /** 已确认存在的菜单版本表（见文件头说明） */
 const versionTracker = new Map<string, number>()
 
+/**
+ * 后端幂等哨兵菜单（权限码 __seed_v1__，DbSeeder 里那行 Btn(9999,...,"SEED_V1")）——
+ * 它只是「是否已播种」的标记，非真实菜单，却在 /sys/menu/tree 里混成一条脏行、还可能被误删导致重复播种。
+ * 故从管理树中剔除（侧栏本就因 visible=false+按钮型不显示它，不受影响）。
+ */
+const SEED_SENTINEL_PERM = '__seed_v1__'
+function stripSentinel(nodes: MenuTreeNode[]): MenuTreeNode[] {
+  return nodes
+    .filter((node) => node.permission !== SEED_SENTINEL_PERM)
+    .map((node) => (node.children?.length ? { ...node, children: stripSentinel(node.children) } : node))
+}
+
+/** 默认只展开到「页面」层：展开含目录/页面子节点的节点，收起各页面下的按钮，避免满屏按钮显乱 */
+function defaultExpandedKeys(nodes: MenuTreeNode[]): string[] {
+  const out: string[] = []
+  const walk = (list: MenuTreeNode[]): void => {
+    list.forEach((node) => {
+      const kids = node.children ?? []
+      if (kids.some((kid) => kid.menuType !== MENU_TYPE.Button)) out.push(node.id)
+      walk(kids)
+    })
+  }
+  walk(nodes)
+  return out
+}
+
 const treeData = ref<MenuTreeNode[]>([])
 const loading = ref(false)
 const keyword = ref('')
@@ -74,8 +100,8 @@ async function loadTree(): Promise<void> {
   loading.value = true
   try {
     const nodes = await getFullMenuTree()
-    treeData.value = nodes ?? []
-    expandedKeys.value = flattenTree(treeData.value, (node) => node.children).map((node) => node.id)
+    treeData.value = stripSentinel(nodes ?? [])
+    expandedKeys.value = defaultExpandedKeys(treeData.value)
   } catch {
     treeData.value = []
   } finally {
