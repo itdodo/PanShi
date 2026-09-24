@@ -80,7 +80,6 @@ function onAction(key: string | number): void {
 .ps-tabs {
   display: flex;
   align-items: flex-end;
-  gap: 4px;
   height: 100%;
   padding: 0 8px 0 6px;
 }
@@ -101,17 +100,56 @@ function onAction(key: string | number): void {
   border-bottom: none;
 }
 
+/* Chrome 标签风：默认透明、悬停浅灰、活动白底(暗色深底)+顶部主色指示条+圆角，压在分隔线上与内容相连。
+   ⚠️ Naive card 型用运行时 CSS-in-JS 注入(特异性高、加载更晚)，故关键属性必须 !important 才盖得住。 */
 .ps-tabs :deep(.n-tabs-tab) {
-  border-radius: 7px 7px 0 0;
+  position: relative;
+  height: 34px;
+  margin: 0 4px -1px 0;
+  padding: 0 12px !important;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid transparent !important;
+  border-bottom: none !important;
+  border-radius: 10px 10px 0 0 !important;
+  background: transparent !important;
+  color: var(--ps-text-3) !important;
+  font-weight: 500;
+  transition: background 0.15s ease, color 0.15s ease;
 }
 
-.ps-tabs :deep(.n-tabs-tab + .n-tabs-tab) {
-  margin-left: 4px;
+.ps-tabs :deep(.n-tabs-tab:hover) {
+  background: var(--ps-tab-hover) !important;
+  color: var(--ps-text-1) !important;
+}
+
+.ps-tabs :deep(.n-tabs-tab--active),
+.ps-tabs :deep(.n-tabs-tab--active:hover) {
+  background: var(--ps-tab-active) !important;
+  border-color: var(--ps-card-border) !important;
+  color: var(--ps-primary) !important;
+  font-weight: 600;
+}
+
+.ps-tabs :deep(.n-tabs-tab--active::before) {
+  content: "";
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  top: 0;
+  height: 2px;
+  border-radius: 0 0 3px 3px;
+  background: var(--ps-primary);
+}
+
+.ps-tabs :deep(.n-tabs-tab__close) {
+  margin-left: 2px;
 }
 
 .ps-tabs__more {
   flex: none;
-  margin-bottom: 4px;
+  margin-bottom: 5px;
 }
 
 .ps-tabs__label {
@@ -120,6 +158,5 @@ function onAction(key: string | number): void {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  vertical-align: bottom;
 }
 </style>
