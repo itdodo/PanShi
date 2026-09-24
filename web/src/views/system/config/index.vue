@@ -165,7 +165,7 @@ const columns = computed<DataTableColumns<ConfigRow>>(() => [
                 { onPositiveClick: () => remove(row) },
                 {
                   trigger: () => h(NButton, { size: 'tiny', text: true, type: 'error' }, { default: () => '删除' }),
-                  description: () => `删除参数「${row.configName}」？`
+                  default: () => `删除参数「${row.configName}」？`
                 }
               )
             : null

@@ -300,7 +300,7 @@ const columns = computed<DataTableColumns<RoleRow>>(() => [
                 { onPositiveClick: () => remove(row) },
                 {
                   trigger: () => h(NButton, { size: 'tiny', text: true, type: 'error' }, { default: () => '删除' }),
-                  description: () => `删除角色「${row.roleName}」将同时解除其菜单授权，确定？`
+                  default: () => `删除角色「${row.roleName}」将同时解除其菜单授权，确定？`
                 }
               )
             : null

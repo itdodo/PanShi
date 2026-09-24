@@ -299,7 +299,7 @@ const columns = computed<DataTableColumns<MenuTreeNode>>(() => [
                 { onPositiveClick: () => remove(row) },
                 {
                   trigger: () => h(NButton, { size: 'tiny', text: true, type: 'error' }, { default: () => '删除' }),
-                  description: () => `删除「${row.menuName}」？存在子菜单时后端会拒绝。`
+                  default: () => `删除「${row.menuName}」？存在子菜单时后端会拒绝。`
                 }
               )
             : null

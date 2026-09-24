@@ -340,7 +340,7 @@ const columns = computed<DataTableColumns<UserRow>>(() => [
               { onPositiveClick: () => resetPassword(row) },
               {
                 trigger: () => h(NButton, { size: 'tiny', text: true, type: 'warning' }, { default: () => '重置密码' }),
-                description: () => '将重置为系统初始密码，确定？'
+                default: () => '将重置为系统初始密码，确定？'
               }
             )
           : null,
@@ -350,7 +350,7 @@ const columns = computed<DataTableColumns<UserRow>>(() => [
               { onPositiveClick: () => remove(row) },
               {
                 trigger: () => h(NButton, { size: 'tiny', text: true, type: 'error' }, { default: () => '删除' }),
-                description: () => `删除用户「${row.nickName}」？`
+                default: () => `删除用户「${row.nickName}」？`
               }
             )
           : null

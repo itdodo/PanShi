@@ -83,7 +83,7 @@ const typeColumns = computed<DataTableColumns<DictTypeRow>>(() => [
                 { onPositiveClick: () => removeType(row) },
                 {
                   trigger: () => h(NButton, { size: 'tiny', text: true, type: 'error' }, { default: () => '删除' }),
-                  description: () => `删除类型「${row.dictName}」及其数据项？`
+                  default: () => `删除类型「${row.dictName}」及其数据项？`
                 }
               )
             : null
@@ -241,7 +241,7 @@ const dataColumns = computed<DataTableColumns<DictDataRow>>(() => [
                 { onPositiveClick: () => removeDataItem(row) },
                 {
                   trigger: () => h(NButton, { size: 'tiny', text: true, type: 'error' }, { default: () => '删除' }),
-                  description: () => `删除数据项「${row.label}」？`
+                  default: () => `删除数据项「${row.label}」？`
                 }
               )
             : null

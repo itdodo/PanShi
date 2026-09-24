@@ -249,7 +249,7 @@ const columns = computed<DataTableColumns<DeptRow>>(() => [
                 { onPositiveClick: () => remove(row) },
                 {
                   trigger: () => h(NButton, { size: 'tiny', text: true, type: 'error' }, { default: () => '删除' }),
-                  description: () => `删除部门「${row.deptName}」？有子部门或已挂用户时后端会拒绝。`
+                  default: () => `删除部门「${row.deptName}」？有子部门或已挂用户时后端会拒绝。`
                 }
               )
             : null

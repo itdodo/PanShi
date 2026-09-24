@@ -168,7 +168,7 @@ const columns = computed<DataTableColumns<PositionRow>>(() => [
                 { onPositiveClick: () => remove(row) },
                 {
                   trigger: () => h(NButton, { size: 'tiny', text: true, type: 'error' }, { default: () => '删除' }),
-                  description: () => `删除岗位「${row.positionName}」？已挂在用户上时后端会拒绝。`
+                  default: () => `删除岗位「${row.positionName}」？已挂在用户上时后端会拒绝。`
                 }
               )
             : null

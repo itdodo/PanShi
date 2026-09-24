@@ -220,7 +220,7 @@ const columns = computed<DataTableColumns<NoticeRow>>(() => [
                 { onPositiveClick: () => remove(row) },
                 {
                   trigger: () => h(NButton, { size: 'tiny', text: true, type: 'error' }, { default: () => '删除' }),
-                  description: () => `删除公告「${row.title}」？`
+                  default: () => `删除公告「${row.title}」？`
                 }
               )
             : null
