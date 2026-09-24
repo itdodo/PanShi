@@ -190,10 +190,18 @@ a {
   background: var(--ps-primary-soft);
 }
 
-.ps-tree-table .n-data-table-expand-trigger .n-base-icon,
-.ps-tree-table .n-data-table-expand-trigger .n-base-icon svg {
+/* Naive 把箭头 .n-base-icon 设成 position:absolute（脱离 flex 居中，落在左上偏 ~3.5px）；
+   改回 static 让外层钮的 align/justify:center 生效，把箭头真正居中。旋转仍在此元素的 transform 上，不受影响。 */
+.ps-tree-table .n-data-table-expand-trigger .n-base-icon {
+  position: static;
   width: 12px;
   height: 12px;
   font-size: 12px;
+}
+
+.ps-tree-table .n-data-table-expand-trigger .n-base-icon svg {
+  display: block;
+  width: 12px;
+  height: 12px;
 }
 
