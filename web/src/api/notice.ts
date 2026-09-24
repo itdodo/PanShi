@@ -46,5 +46,8 @@ export function markMessageRead(id: string): Promise<VoidResult> {
 }
 
 export function markAllRead(): Promise<VoidResult> {
-  return post<VoidResult>('/sys/message/my/read-all', undefined, { silent: true })
+  // ⚠️ 后端路由是 [Route("api/v1/sys/message")] + [HttpPost("read-all")]，不带 my/ 段
+  //（与 my/page、my/{id}/read 不同）。这里刻意不 silent：它是用户显式点击的动作，
+  // 失败必须冒泡提示，否则又会变成「点了没反应也不报错」。
+  return post<VoidResult>('/sys/message/read-all')
 }
