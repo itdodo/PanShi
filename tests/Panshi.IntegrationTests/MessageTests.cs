@@ -127,6 +127,22 @@ public class MessageTests(PgFixture fx) : PgTestBase(fx)
     }
 
     [Fact]
+    public async Task ClearRead_Does_Not_Count_AlreadySoftDeleted_Rows()
+    {
+        // 回归：批量软删曾漏掉 !IsDeleted 条件（全局过滤器不作用于 Updateable），
+        // 会把已删行计入受影响行数并重复 UPDATE 审计字段。
+        long uid = SnowflakeId.NextId();
+        await Put(uid, "已读甲", null, true);
+        await Put(uid, "已读乙", null, true);
+        var third = await Put(uid, "已读丙", null, true);
+        var svc = Svc();
+
+        await svc.DeleteAsync(uid, third);          // 先软删一条（它仍是 is_read=true）
+        Assert.Equal(2, await svc.ClearReadAsync(uid)); // 只该报剩下的 2 条，不能把上面那条重复算进去
+        Assert.Equal(0, (await svc.MyPageAsync(uid, Q(uid))).Total);
+    }
+
+    [Fact]
     public async Task ClearRead_Does_Not_Touch_OtherUsers()
     {
         long a = SnowflakeId.NextId();

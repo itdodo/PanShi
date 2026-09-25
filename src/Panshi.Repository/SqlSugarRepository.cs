@@ -164,11 +164,16 @@ public class SqlSugarRepository<T>(ISqlSugarClient db) : IRepository<T> where T 
     {
         var by = OperationUser.UserId;
         var now = DateTime.Now;
+        // ⚠️ 必须再叠一层 !IsDeleted，与 SoftDeleteAsync(long id) 重载保持一致：
+        // SqlSugar 的全局 IsDeleted 查询过滤器不作用于 Updateable，少了这层就会把已软删的行
+        // 也计入「受影响行数」（实测清空已读把 3 条早已删除的消息算进去，报 14 而界面只有 11），
+        // 且对它们重复 UPDATE UpdateTime/UpdateBy，污染审计字段。
         return await Db.Updateable<T>()
             .SetColumns(it => it.IsDeleted == true)
             .SetColumns(it => it.UpdateTime == now)
             .SetColumns(it => it.UpdateBy == by)
             .Where(where)
+            .Where(it => !it.IsDeleted)
             .ExecuteCommandAsync();
     }
 
