@@ -9,6 +9,7 @@ import {
   NForm,
   NFormItem,
   NInput,
+  NPagination,
   NPopconfirm,
   NRadioButton,
   NRadioGroup,
@@ -35,7 +36,7 @@ const notice = useNoticeStore()
 /* ------------------------------- 我的收件箱 ------------------------------- */
 type ReadFilter = 'all' | 'unread' | 'read'
 
-const PAGE_SIZE = 10
+const PAGE_SIZES = [10, 20, 50, 100]
 
 const filter = ref<ReadFilter>('all')
 /** 关键字：命中 标题/内容/发送人（后端 LIKE），与筛选、分页共用同一个查询接口 */
@@ -43,8 +44,8 @@ const keyword = ref('')
 const rows = ref<MessageDto[]>([])
 const total = ref(0)
 const pageNum = ref(1)
+const pageSize = ref(20)
 const inboxLoading = ref(false)
-const loadingMore = ref(false)
 const marking = ref(false)
 const clearing = ref(false)
 /** 就地展开阅读的消息 id（同时是标已读的触发） */
@@ -53,15 +54,13 @@ const selectedId = ref<string | null>(null)
 const isReadParam = (f: ReadFilter): boolean | undefined => (f === 'all' ? undefined : f === 'read')
 const kwParam = (): string | undefined => keyword.value.trim() || undefined
 
-const finished = computed(() => rows.value.length >= total.value)
-
-async function loadInbox(silent = false): Promise<void> {
-  if (!silent) inboxLoading.value = true
-  pageNum.value = 1
+/** 按当前 pageNum/pageSize/filter/keyword 拉一页 */
+async function fetchPage(): Promise<void> {
+  inboxLoading.value = true
   try {
     const result = await pageMyMessages({
-      pageNum: 1,
-      pageSize: PAGE_SIZE,
+      pageNum: pageNum.value,
+      pageSize: pageSize.value,
       isRead: isReadParam(filter.value),
       keyword: kwParam()
     })
@@ -75,30 +74,35 @@ async function loadInbox(silent = false): Promise<void> {
   }
 }
 
-async function loadMore(): Promise<void> {
-  if (finished.value) return
-  loadingMore.value = true
-  try {
-    const next = pageNum.value + 1
-    const result = await pageMyMessages({
-      pageNum: next,
-      pageSize: PAGE_SIZE,
-      isRead: isReadParam(filter.value),
-      keyword: kwParam()
-    })
-    rows.value = [...rows.value, ...(result?.rows ?? [])]
-    total.value = Number(result?.total ?? total.value)
-    pageNum.value = next
-  } catch {
-    /* 静默接口：保留已加载数据 */
-  } finally {
-    loadingMore.value = false
-  }
+/** 条件变了（搜索/筛选/刷新/发送后）回第一页 */
+async function loadInbox(): Promise<void> {
+  pageNum.value = 1
+  selectedId.value = null
+  await fetchPage()
+}
+
+async function goPage(page: number): Promise<void> {
+  pageNum.value = page
+  selectedId.value = null
+  await fetchPage()
+}
+
+async function onPageSizeChange(size: number): Promise<void> {
+  pageSize.value = size
+  await goPage(1)
+}
+
+/**
+ * 增删改后重载。分页模式特有边界：当前页被删空且不是第一页时自动回退一页，
+ * 否则用户会停在一个空白页上（瀑布流没这问题）。
+ */
+async function reloadAfterMutation(): Promise<void> {
+  await fetchPage()
+  if (!rows.value.length && pageNum.value > 1) await goPage(pageNum.value - 1)
 }
 
 async function onFilterChange(value: string | number | boolean): Promise<void> {
   filter.value = value as ReadFilter
-  selectedId.value = null
   await loadInbox()
 }
 
@@ -121,7 +125,7 @@ async function onReadAll(): Promise<void> {
     await markAllRead()
     message.success('已全部标记为已读')
     selectedId.value = null
-    await Promise.allSettled([loadInbox(true), notice.refreshCount()])
+    await Promise.allSettled([reloadAfterMutation(), notice.refreshCount()])
   } catch {
     /* 拦截器/静默处理 */
   } finally {
@@ -135,7 +139,7 @@ async function removeMessage(item: MessageDto): Promise<void> {
     await deleteMessage(item.id)
     message.success('消息已删除')
     if (selectedId.value === item.id) selectedId.value = null
-    await Promise.allSettled([loadInbox(true), notice.refreshCount()])
+    await Promise.allSettled([reloadAfterMutation(), notice.refreshCount()])
   } catch {
     /* 拦截器已提示 */
   }
@@ -149,7 +153,7 @@ async function onClearRead(): Promise<void> {
     message.success(n ? `已清空 ${n} 条已读消息` : '没有可清空的已读消息')
     if (n) {
       selectedId.value = null
-      await Promise.allSettled([loadInbox(true), notice.refreshCount()])
+      await Promise.allSettled([reloadAfterMutation(), notice.refreshCount()])
     }
   } catch {
     /* 拦截器已提示 */
@@ -232,7 +236,7 @@ async function doSend(): Promise<void> {
     message.success(`已发送给 ${sendModel.receiverIds.length} 位接收人`)
     resetSendForm()
     drawerVisible.value = false
-    await Promise.allSettled([notice.refreshCount(), loadInbox(true)])
+    await Promise.allSettled([notice.refreshCount(), loadInbox()])
   } catch {
     /* 拦截器已提示 */
   } finally {
@@ -334,12 +338,18 @@ onMounted(() => {
         </ul>
       </NSpin>
 
-      <NSpace justify="center" align="center" class="ps-message__more">
-        <NButton v-if="!finished" size="small" tertiary :loading="loadingMore" @click="loadMore">
-          加载更多（已显示 {{ rows.length }}/{{ total }}）
-        </NButton>
-        <span v-else-if="rows.length" class="ps-muted">已显示全部 {{ rows.length }} 条</span>
-      </NSpace>
+      <div v-if="total > 0" class="ps-message__foot">
+        <NPagination
+          :page="pageNum"
+          :item-count="total"
+          :page-size="pageSize"
+          :page-sizes="PAGE_SIZES"
+          show-size-picker
+          size="small"
+          @update:page="goPage"
+          @update:page-size="onPageSizeChange"
+        />
+      </div>
     </NCard>
 
     <NDrawer v-model:show="drawerVisible" :width="480" placement="right">
@@ -508,8 +518,11 @@ onMounted(() => {
   color: var(--ps-text-3);
 }
 
-.ps-message__more {
-  margin-top: 12px;
-  min-height: 24px;
+.ps-message__foot {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--ps-card-border);
 }
 </style>
