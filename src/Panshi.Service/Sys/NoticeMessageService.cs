@@ -106,6 +106,11 @@ public class MessageService(IRepository<SysMessage> repo, INotifyService notify)
         exp.And(m => m.ReceiverId == userId);
         if (query.IsRead is not null) exp.And(m => m.IsRead == query.IsRead!.Value);
         if (query.MsgType is not null) exp.And(m => m.MsgType == query.MsgType!.Value);
+        if (!string.IsNullOrWhiteSpace(query.Keyword))
+        {
+            var kw = query.Keyword.Trim();
+            exp.And(m => m.Title.Contains(kw) || m.Content!.Contains(kw) || m.SenderName!.Contains(kw));
+        }
         var (col, desc) = query.ResolveSort(new Dictionary<string, string> { ["createTime"] = "create_time" });
         var page = await repo.PageAsync(exp.ToExpression(), query.PageNum, query.PageSize, col, desc);
         return new PagedResult<MessageDto> { Total = page.Total, Rows = page.Rows.Select(ToDto).ToList() };
@@ -138,6 +143,21 @@ public class MessageService(IRepository<SysMessage> repo, INotifyService notify)
                 .UpdateColumns(m => new { m.IsRead, m.ReadTime })
                 .ExecuteCommandAsync();
     }
+
+    /// <summary>删除单条收件箱消息：软删（全局 IsDeleted 过滤器随即可见性生效），只允许本人删自己的。</summary>
+    public async Task DeleteAsync(long userId, long id)
+    {
+        // 用 FindAsync 而非 GetAsync：后者对「不存在/已删」是抛 BizException，会让二次删除报错。
+        // 删除按幂等处理（多标签页并发删同一条、或刚清空已读后再点删除，都不该给用户弹错）。
+        var m = await repo.FindAsync(x => x.Id == id);
+        if (m is null) return;
+        if (m.ReceiverId != userId) throw BizException.Forbidden("越权操作");
+        await repo.SoftDeleteAsync(id);
+    }
+
+    /// <summary>清空已读：只软删本人已读消息，未读一律保留。</summary>
+    public async Task<int> ClearReadAsync(long userId)
+        => await repo.SoftDeleteAsync(m => m.ReceiverId == userId && m.IsRead);
 
     static MessageDto ToDto(SysMessage m) => new()
     {

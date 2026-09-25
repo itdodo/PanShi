@@ -137,6 +137,14 @@ public class MessageController(MessageService messages) : ControllerBase
 
     [HttpPost("read-all")]
     public async Task ReadAll() => await messages.MarkAllReadAsync(Uid);
+
+    /// <summary>删除本人某条消息（软删；不存在/已删按幂等成功）。</summary>
+    [HttpDelete("my/{id:long}")]
+    public async Task DeleteMy(long id) => await messages.DeleteAsync(Uid, id);
+
+    /// <summary>清空本人已读消息，返回删除条数。⚠️ 与 my/{id:long}/read 段数不同，不会抢匹配。</summary>
+    [HttpDelete("my/read")]
+    public async Task<int> ClearRead() => await messages.ClearReadAsync(Uid);
 }
 
 /// <summary>日志审计。</summary>

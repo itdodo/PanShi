@@ -281,6 +281,9 @@ public class MessageQuery : PagedQuery
     public bool? IsRead { get; set; }
 
     public MessageType? MsgType { get; set; }
+
+    /// <summary>关键字：命中 标题 / 内容 / 发送人 任一即算（LIKE 包含匹配）。</summary>
+    public string? Keyword { get; set; }
 }
 
 public class MessageDto

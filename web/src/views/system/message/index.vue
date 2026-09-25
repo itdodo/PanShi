@@ -21,7 +21,7 @@ import {
   type SelectOption
 } from 'naive-ui'
 import { sendMessage, userOptions } from '@/api/admin'
-import { markAllRead, markMessageRead, pageMyMessages, type MessageDto } from '@/api/notice'
+import { clearReadMessages, deleteMessage, markAllRead, markMessageRead, pageMyMessages, type MessageDto } from '@/api/notice'
 import { useNoticeStore } from '@/stores/notice'
 import { message } from '@/utils/feedback'
 import { formatDateTime, fromNow } from '@/utils/format'
@@ -38,16 +38,20 @@ type ReadFilter = 'all' | 'unread' | 'read'
 const PAGE_SIZE = 10
 
 const filter = ref<ReadFilter>('all')
+/** 关键字：命中 标题/内容/发送人（后端 LIKE），与筛选、分页共用同一个查询接口 */
+const keyword = ref('')
 const rows = ref<MessageDto[]>([])
 const total = ref(0)
 const pageNum = ref(1)
 const inboxLoading = ref(false)
 const loadingMore = ref(false)
 const marking = ref(false)
+const clearing = ref(false)
 /** 就地展开阅读的消息 id（同时是标已读的触发） */
 const selectedId = ref<string | null>(null)
 
 const isReadParam = (f: ReadFilter): boolean | undefined => (f === 'all' ? undefined : f === 'read')
+const kwParam = (): string | undefined => keyword.value.trim() || undefined
 
 const finished = computed(() => rows.value.length >= total.value)
 
@@ -58,7 +62,8 @@ async function loadInbox(silent = false): Promise<void> {
     const result = await pageMyMessages({
       pageNum: 1,
       pageSize: PAGE_SIZE,
-      isRead: isReadParam(filter.value)
+      isRead: isReadParam(filter.value),
+      keyword: kwParam()
     })
     rows.value = result?.rows ?? []
     total.value = Number(result?.total ?? 0)
@@ -78,7 +83,8 @@ async function loadMore(): Promise<void> {
     const result = await pageMyMessages({
       pageNum: next,
       pageSize: PAGE_SIZE,
-      isRead: isReadParam(filter.value)
+      isRead: isReadParam(filter.value),
+      keyword: kwParam()
     })
     rows.value = [...rows.value, ...(result?.rows ?? [])]
     total.value = Number(result?.total ?? total.value)
@@ -120,6 +126,35 @@ async function onReadAll(): Promise<void> {
     /* 拦截器/静默处理 */
   } finally {
     marking.value = false
+  }
+}
+
+/** 删除单条（软删） */
+async function removeMessage(item: MessageDto): Promise<void> {
+  try {
+    await deleteMessage(item.id)
+    message.success('消息已删除')
+    if (selectedId.value === item.id) selectedId.value = null
+    await Promise.allSettled([loadInbox(true), notice.refreshCount()])
+  } catch {
+    /* 拦截器已提示 */
+  }
+}
+
+/** 清空已读（未读一律保留） */
+async function onClearRead(): Promise<void> {
+  clearing.value = true
+  try {
+    const n = await clearReadMessages()
+    message.success(n ? `已清空 ${n} 条已读消息` : '没有可清空的已读消息')
+    if (n) {
+      selectedId.value = null
+      await Promise.allSettled([loadInbox(true), notice.refreshCount()])
+    }
+  } catch {
+    /* 拦截器已提示 */
+  } finally {
+    clearing.value = false
   }
 }
 
@@ -217,10 +252,21 @@ onMounted(() => {
     <NCard :bordered="false">
       <template #header>
         <div class="ps-message__head">
-          <NSpace align="center" :size="8">
+          <NSpace align="center" :size="10">
             <span class="ps-message__head-title">我的收件箱</span>
             <NTag size="small" :bordered="false" type="warning">未读 {{ notice.unreadCount }}</NTag>
             <NTag size="small" :bordered="false">共 {{ total }} 条</NTag>
+            <NInput
+              v-model:value="keyword"
+              size="small"
+              clearable
+              placeholder="搜索标题 / 内容 / 发送人"
+              style="width: 240px"
+              @keyup.enter="loadInbox()"
+              @clear="loadInbox()"
+            >
+              <template #prefix><icon-lucide-search style="width: 14px; height: 14px" /></template>
+            </NInput>
           </NSpace>
           <NSpace align="center" :size="8" :wrap="false">
             <NRadioGroup :value="filter" size="small" @update:value="onFilterChange">
@@ -237,6 +283,12 @@ onMounted(() => {
               </template>
               确认把全部未读消息标记为已读？
             </NPopconfirm>
+            <NPopconfirm @positive-click="onClearRead">
+              <template #trigger>
+                <NButton size="small" tertiary :loading="clearing">清空已读</NButton>
+              </template>
+              确认清空全部「已读」消息？未读消息会保留。
+            </NPopconfirm>
             <NButton v-permission="'sys:message:send'" size="small" type="primary" @click="openSend">
               <template #icon><icon-lucide-pen-square /></template>
               写消息
@@ -246,7 +298,11 @@ onMounted(() => {
       </template>
 
       <NSpin :show="inboxLoading">
-        <NEmpty v-if="!inboxLoading && !rows.length" description="收件箱暂无消息" style="padding: 48px 0" />
+        <NEmpty
+          v-if="!inboxLoading && !rows.length"
+          :description="keyword.trim() ? `没有匹配「${keyword.trim()}」的消息` : '收件箱暂无消息'"
+          style="padding: 48px 0"
+        />
         <ul v-else class="ps-message__list">
           <li v-for="item in rows" :key="item.id" class="ps-message__item" :class="{ 'ps-message__item--open': selectedId === item.id }">
             <div class="ps-message__row" @click="toggleOpen(item)">
@@ -258,6 +314,12 @@ onMounted(() => {
               <NTag size="small" :bordered="false" :type="msgTypeTag(item.msgType).type">
                 {{ msgTypeTag(item.msgType).label }}
               </NTag>
+              <NPopconfirm @positive-click="removeMessage(item)">
+                <template #trigger>
+                  <NButton class="ps-message__del" size="tiny" text type="error" @click.stop>删除</NButton>
+                </template>
+                删除这条消息？删除后不可恢复。
+              </NPopconfirm>
               <icon-lucide-chevron-down class="ps-message__caret" :class="{ 'ps-message__caret--open': selectedId === item.id }" />
             </div>
             <div v-if="selectedId === item.id" class="ps-message__detail">

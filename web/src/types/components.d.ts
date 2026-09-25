@@ -30,6 +30,7 @@ declare module 'vue' {
     IconLucidePanelLeftClose: typeof import('~icons/lucide/panel-left-close')['default']
     IconLucidePenSquare: typeof import('~icons/lucide/pen-square')['default']
     IconLucideRefreshCcw: typeof import('~icons/lucide/refresh-ccw')['default']
+    IconLucideSearch: typeof import('~icons/lucide/search')['default']
     IconLucideShield: typeof import('~icons/lucide/shield')['default']
     IconLucideShieldCheck: typeof import('~icons/lucide/shield-check')['default']
     IconLucideSun: typeof import('~icons/lucide/sun')['default']

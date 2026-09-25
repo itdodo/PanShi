@@ -1,4 +1,4 @@
-import { get, post } from './http'
+import { del, get, post } from './http'
 import type { PageQuery, PagedResult, VoidResult } from './types'
 
 /** 公告（后端批次 #6 提供 /sys/notice/*，未上线时全部静默失败，不阻塞布局） */
@@ -33,7 +33,9 @@ export function latestNotices(limit = 5): Promise<NoticeDto[]> {
   return get<NoticeDto[]>('/sys/notice/latest', { limit }, { silent: true })
 }
 
-export function pageMyMessages(query: PageQuery & { isRead?: boolean }): Promise<PagedResult<MessageDto>> {
+export function pageMyMessages(
+  query: PageQuery & { isRead?: boolean; keyword?: string }
+): Promise<PagedResult<MessageDto>> {
   return get<PagedResult<MessageDto>>('/sys/message/my/page', query, { silent: true })
 }
 
@@ -50,4 +52,14 @@ export function markAllRead(): Promise<VoidResult> {
   //（与 my/page、my/{id}/read 不同）。这里刻意不 silent：它是用户显式点击的动作，
   // 失败必须冒泡提示，否则又会变成「点了没反应也不报错」。
   return post<VoidResult>('/sys/message/read-all')
+}
+
+/** 删除本人某条消息（软删）。同为显式动作，失败要冒泡 */
+export function deleteMessage(id: string): Promise<VoidResult> {
+  return del<VoidResult>(`/sys/message/my/${id}`)
+}
+
+/** 清空本人已读消息，返回删除条数 */
+export function clearReadMessages(): Promise<number> {
+  return del<number>('/sys/message/my/read')
 }
