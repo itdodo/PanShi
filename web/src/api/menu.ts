@@ -66,6 +66,14 @@ export function getFullMenuTree(): Promise<MenuTreeNode[]> {
   return get<MenuTreeNode[]>('/sys/menu/tree')
 }
 
+/**
+ * 授权用全量菜单树：登录即可、只读。角色「授权菜单」弹窗用这个，
+ * 免得只管用户的角色（有 sys:role:* 却没 sys:menu:list）打开弹窗是 403 + 空树。
+ */
+export function getGrantMenuTree(): Promise<MenuTreeNode[]> {
+  return get<MenuTreeNode[]>('/sys/menu/tree/grant')
+}
+
 export function createMenu(dto: MenuFormDto): Promise<string> {
   return post<string>('/sys/menu', dto)
 }

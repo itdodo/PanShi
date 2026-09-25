@@ -26,7 +26,7 @@ import {
 } from 'naive-ui'
 import { post, put } from '@/api/http'
 import { createRole, deleteRole, getRole, pageRoles, type RoleDto } from '@/api/system/role'
-import { getFullMenuTree, type MenuTreeNode } from '@/api/menu'
+import { getGrantMenuTree, type MenuTreeNode } from '@/api/menu'
 import { getDeptTree } from '@/api/system/dept'
 import { usePageList } from '@/composables/usePageList'
 import { useUserStore } from '@/stores/user'
@@ -39,6 +39,7 @@ import { SCOPE_CUSTOM, SCOPE_OPTIONS, STATUS_OPTIONS, pruneChildren, scopeLabel,
  * 角色管理（/sys/role）：分页 + CRUD + 「授权菜单」弹窗（菜单树勾选 + 数据权限五档 + 自定义部门）。
  * 后端 PUT /sys/role/{id}（RoleUpdateDto 含 version）；授权走 POST /sys/role/{id}/menus（GrantMenusDto，
  * 无需回传 version，避免与基础信息编辑互相覆盖）。列表不回传 menuIds/deptIds，弹窗打开时用 GET /sys/role/{id} 取。
+ * 授权树的菜单结构走 GET /sys/menu/tree/grant（登录即可），不走 sys:menu:list 的全量树。
  */
 type RoleRow = RoleDto
 /** GET /sys/role/{id} 额外回传已授权 menuIds/deptIds（列表页不带这两个字段；api/role.ts 的 RoleDto 未声明） */
@@ -76,9 +77,10 @@ const menuTreeOptions = computed<TreeOption[]>(() =>
   )
 )
 
+/** 树数据源失败不静默吞掉——之前吞掉后授权弹窗只剩一棵空树，看不出是 403 */
 async function loadTrees(): Promise<void> {
-  menuTree.value = (await getFullMenuTree().catch(() => [])) ?? []
-  const dept = (await getDeptTree().catch(() => [])) ?? []
+  menuTree.value = (await getGrantMenuTree()) ?? []
+  const dept = (await getDeptTree()) ?? []
   deptNodes.value = toTreeOptions(
     pruneChildren(dept),
     (node) => node.id,
@@ -311,7 +313,8 @@ const columns = computed<DataTableColumns<RoleRow>>(() => [
 ])
 
 onMounted(() => {
-  void loadTrees()
+  // 全局提示已由 http 拦截器负责，这里只防止未处理的 rejection
+  void loadTrees().catch(() => undefined)
 })
 </script>
 
@@ -442,7 +445,7 @@ onMounted(() => {
         <NGi>
           <div class="ps-grant-tree">
             <NTree
-              v-if="!grantLoading"
+              v-if="!grantLoading && menuTreeOptions.length"
               block-line
               checkable
               :cascade="true"
@@ -451,6 +454,9 @@ onMounted(() => {
               v-model:expanded-keys="expandedKeys"
               @update:checked-keys="checkedKeys = toStrIds($event)"
             />
+            <NAlert v-else-if="!grantLoading" type="warning" :bordered="false">
+              菜单树为空或加载失败，请关闭本弹窗后重新打开。
+            </NAlert>
             <NAlert v-else type="default" :bordered="false">菜单树加载中…</NAlert>
           </div>
         </NGi>

@@ -53,7 +53,7 @@ public class RoleController(RoleService roles, PermissionService permissions) : 
         => File(await roles.ExportBytesAsync(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "角色.xlsx");
 }
 
-/// <summary>菜单管理（tree 全量分权 / tree/my 登录即可）。</summary>
+/// <summary>菜单管理（tree 全量分权 / tree/my 与 tree/grant 登录即可）。</summary>
 [ApiController]
 [Authorize]
 [Route("api/v1/sys/menu")]
@@ -69,6 +69,13 @@ public class MenuController(MenuService menus) : ControllerBase
     /// <summary>我的菜单树（动态路由数据源；无角色=空树）。</summary>
     [HttpGet("tree/my")]
     public async Task<List<MenuDto>> MyTree() => await menus.MyTreeAsync(Uid);
+
+    /// <summary>
+    /// 授权用全量菜单树：登录即可、只读。角色页「授权菜单」弹窗只需要结构，
+    /// 不要求调用者持有 sys:menu:list——否则只管用户的角色（有 sys:role:* 无菜单权限）打开弹窗是 403 + 空树。
+    /// </summary>
+    [HttpGet("tree/grant")]
+    public async Task<List<MenuDto>> GrantTree() => await menus.FullTreeAsync();
 
     [HttpGet("options")]
     [HasPermission("sys:menu:list")]
