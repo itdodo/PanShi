@@ -371,14 +371,15 @@ const columns = computed<DataTableColumns<NoticeRow>>(() => [
         </NFormItem>
       </NForm>
       <template #action>
+        <!-- size=small 与 dialog 预设正/负按钮一致（Dialog.mjs 里写死 size:'small'，自定义槽不会继承） -->
         <NSpace :size="8">
-          <NButton :disabled="saving" tertiary @click="modalVisible = false">取消</NButton>
+          <NButton size="small" :disabled="saving" tertiary @click="modalVisible = false">取消</NButton>
           <template v-if="editing">
-            <NButton type="primary" :loading="saving" @click="submit()">保存</NButton>
+            <NButton size="small" type="primary" :loading="saving" @click="submit()">保存</NButton>
           </template>
           <template v-else>
-            <NButton :disabled="saving" tertiary @click="submitDraft">存草稿</NButton>
-            <NButton type="primary" :loading="saving" @click="submitPublish">{{ publishLabel }}</NButton>
+            <NButton size="small" :disabled="saving" tertiary @click="submitDraft">存草稿</NButton>
+            <NButton size="small" type="primary" :loading="saving" @click="submitPublish">{{ publishLabel }}</NButton>
           </template>
         </NSpace>
       </template>
