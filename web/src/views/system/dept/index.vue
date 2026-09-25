@@ -52,6 +52,8 @@ type DeptFormModel = {
   parentId: string
   deptCode: string
   deptName: string
+  /** 负责人文本（UI 不编辑它，但必须原样回传：后端 Apply 里 dept.Leader = dto.Leader，缺省即清空） */
+  leader?: string | null
   leaderUserId: string | null
   sort: number
   status: number
@@ -125,6 +127,7 @@ const form = reactive<DeptFormModel>({
   parentId: ROOT_KEY,
   deptCode: '',
   deptName: '',
+  leader: null,
   leaderUserId: null,
   sort: 10,
   status: 0,
@@ -144,6 +147,7 @@ function resetForm(): void {
   form.parentId = ROOT_KEY
   form.deptCode = ''
   form.deptName = ''
+  form.leader = null
   form.leaderUserId = null
   form.sort = 10
   form.status = 0
@@ -161,6 +165,7 @@ function openEdit(row: DeptRow): void {
   form.parentId = row.parentId ?? ROOT_KEY
   form.deptCode = row.deptCode
   form.deptName = row.deptName
+  form.leader = row.leader ?? null
   form.leaderUserId = row.leaderUserId ?? null
   form.sort = row.sort
   form.status = row.status
@@ -176,6 +181,7 @@ async function submit(): Promise<boolean> {
     parentId: form.parentId === ROOT_KEY ? null : form.parentId,
     deptCode: form.deptCode.trim(),
     deptName: form.deptName.trim(),
+    leader: form.leader ?? null,
     leaderUserId: form.leaderUserId,
     sort: form.sort,
     status: form.status

@@ -34,6 +34,8 @@ export interface MenuTreeNode {
   /** 启用状态：0 启用 / 1 停用（见 MENU_STATUS，别写反） */
   status: number
   sort: number
+  /** 乐观锁版本：后端 MenuDto 会回传（MenuService.ToDto），编辑提交必须原样带上 */
+  version?: number
   children?: MenuTreeNode[] | null
 }
 
@@ -68,8 +70,9 @@ export function createMenu(dto: MenuFormDto): Promise<string> {
   return post<string>('/sys/menu', dto)
 }
 
-export function updateMenu(dto: MenuFormDto): Promise<VoidResult> {
-  return put<VoidResult>('/sys/menu', dto)
+/** 后端是 [HttpPut("{id:long}")]，路径必须带 id（曾漏掉写成裸 /sys/menu → 404） */
+export function updateMenu(dto: MenuFormDto & { id: string }): Promise<VoidResult> {
+  return put<VoidResult>(`/sys/menu/${dto.id}`, dto)
 }
 
 export function deleteMenu(id: string): Promise<VoidResult> {

@@ -33,8 +33,8 @@ import AppIcon from '@/components/AppIcon.vue'
 /**
  * 菜单管理（/sys/menu）：树形表格 + 按 menuType 动态显隐的编辑弹窗 + 删除（上移/下移本批次不做）。
  * 后端 GET /sys/menu/tree（全量树，需 sys:menu:list）、POST /sys/menu、PUT /sys/menu/{id}、DELETE /sys/menu/{id}。
- * ⚠️ 乐观锁：后端 MenuDto 目前不回传 version（新增落库 version=0），故页内用 versionTracker 记「本会话已知版本」，
- *    每次编辑成功后 +1；他人并发改动由 409 拦截器提示，刷新页面即回到真值。
+ * 乐观锁：MenuDto 会回传 version（MenuService.ToDto），故编辑态直接带 row.version 提交，
+ * 与 user/role/dept 各页一致。（曾用页内 versionTracker 且缺省 0，刷新后再保存必撞 409。）
  */
 type MenuFormModel = {
   id: string | null
@@ -48,10 +48,8 @@ type MenuFormModel = {
   visible: boolean
   status: number
   sort: number
+  version: number
 }
-
-/** 已确认存在的菜单版本表（见文件头说明） */
-const versionTracker = new Map<string, number>()
 
 /**
  * 后端幂等哨兵菜单（权限码 __seed_v1__，DbSeeder 里那行 Btn(9999,...,"SEED_V1")）——
@@ -155,7 +153,8 @@ const form = reactive<MenuFormModel>({
   icon: '',
   visible: true,
   status: 0,
-  sort: 10
+  sort: 10,
+  version: 0
 })
 
 const rules = computed<FormRules>(() => ({
@@ -183,6 +182,7 @@ function resetForm(): void {
   form.visible = true
   form.status = 0
   form.sort = 10
+  form.version = 0
 }
 
 function openCreate(parent?: MenuTreeNode): void {
@@ -207,6 +207,7 @@ function openEdit(row: MenuTreeNode): void {
   form.visible = row.visible
   form.status = row.status
   form.sort = row.sort
+  form.version = row.version ?? 0
   modalVisible.value = true
 }
 
@@ -232,10 +233,8 @@ async function submit(): Promise<boolean> {
   const dto = buildDto()
   try {
     if (editing.value && form.id) {
-      const expected = versionTracker.get(form.id) ?? 0
       // 后端 PUT /sys/menu/{id}（声明式 updateMenu 地址少一段 id，故直调）
-      await put(`/sys/menu/${form.id}`, { ...dto, version: expected })
-      versionTracker.set(form.id, expected + 1)
+      await put(`/sys/menu/${form.id}`, { ...dto, version: form.version })
       message.success('菜单已保存')
     } else {
       await createMenu(dto)
@@ -253,7 +252,6 @@ async function submit(): Promise<boolean> {
 async function remove(row: MenuTreeNode): Promise<void> {
   try {
     await deleteMenu(row.id)
-    versionTracker.delete(row.id)
     message.success('已删除')
     await loadTree()
   } catch {

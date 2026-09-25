@@ -130,8 +130,8 @@ export const kickOnline = (sessionId: string) => del<VoidResult>(`/monitor/onlin
 export const serverInfo = () => get<ServerInfo>('/monitor/server')
 export const hangfireConsoleUrl = '/hangfire'
 
-/** 站内信发送补充（/sys/message send——my 系列已在别处） */
-export const sendMessage = (d: { receiverIds: number[]; title: string; content?: string }) =>
+/** 站内信发送补充（/sys/message send——my 系列已在别处）。id 用字符串，避免雪花 id 走 Number 丢精度 */
+export const sendMessage = (d: { receiverIds: (string | number)[]; title: string; content?: string }) =>
   post<VoidResult>('/sys/message/send', d)
 
 /** 通用选项类 */

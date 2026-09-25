@@ -301,7 +301,7 @@ const columns = computed<DataTableColumns<UserRow>>(() => [
         {
           default: () =>
             ids.map((id) =>
-              h(NTag, { key: id, size: 'small', bordered: false, type: 'info' }, { default: () => roleMap.value.get(id) ?? id })
+              h(NTag, { key: id, size: 'small', bordered: false, type: 'info' }, { default: () => roleMap.value.get(id) ?? '已停用/已删除' })
             )
         }
       )

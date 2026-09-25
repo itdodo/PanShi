@@ -92,6 +92,8 @@ export const TAG_TYPE_OPTIONS: { label: string; value: string }[] = [
 ]
 
 export function tagTypeOf(value?: string | null): TagType {
+  // 字典种子数据里写的是 "danger"（DbSeeder），而 Naive 的对应色叫 "error"；不别名会一律退成默认灰
+  if (value === 'danger') return 'error'
   const allowed: TagType[] = ['default', 'primary', 'info', 'success', 'warning', 'error']
   return allowed.includes(value as TagType) ? (value as TagType) : 'default'
 }

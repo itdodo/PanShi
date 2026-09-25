@@ -12,16 +12,18 @@ export interface DictTypeDto {
   version: number
 }
 
+/** 后端 DictDataDto：{ id, dictTypeId, label, value, sort, status, tagType, version }（字段名不是 dictLabel/dictValue） */
 export interface DictItemDto {
   id: string
-  dictType: string
-  dictLabel: string
-  dictValue: string
-  /** 标签色（Naive ui tag type：default/info/success/warning/error） */
+  dictTypeId: string
+  label: string
+  value: string
+  /** 标签色（Naive ui tag type：default/info/success/warning/error；种子里的 danger 由 tagTypeOf 归一为 error） */
   tagType?: string | null
   sort: number
   status: number
   remark?: string | null
+  version?: number
 }
 
 export function pageDictTypes(query: PageQuery & { keyword?: string }): Promise<PagedResult<DictTypeDto>> {

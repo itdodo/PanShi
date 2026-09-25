@@ -25,7 +25,8 @@ export async function loadExpenseCategories(): Promise<CategoryOption[]> {
   if (cache) return cache
   try {
     const items = await getDictItems(EXPENSE_CATEGORY_DICT)
-    cache = items?.length ? items.map((i) => ({ value: i.dictValue, label: i.dictLabel })) : EXPENSE_CATEGORIES
+    // 后端 DictDataDto 字段是 label/value（不是 dictLabel/dictValue），读错会得到全 undefined 的下拉
+    cache = items?.length ? items.map((i) => ({ value: i.value, label: i.label })) : EXPENSE_CATEGORIES
   } catch {
     cache = EXPENSE_CATEGORIES
   }

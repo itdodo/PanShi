@@ -141,7 +141,7 @@ const sending = ref(false)
 const optionsLoading = ref(false)
 const receiverOptions = ref<SelectOption[]>([])
 
-const sendModel = reactive<{ receiverIds: number[]; title: string; content: string }>({
+const sendModel = reactive<{ receiverIds: string[]; title: string; content: string }>({
   receiverIds: [],
   title: '',
   content: ''
@@ -159,10 +159,11 @@ async function loadOptions(): Promise<void> {
   optionsLoading.value = true
   try {
     const list = await userOptions()
-    // 契约：MessageSendDto.ReceiverIds 是 List<long>，故值必须转 Number
+    // ⚠️ 接收人 id 保持字符串：后端契约是 List<long> 且 JsonConfig 允许字符串读入，
+    // 而 Number() 化对雪花 id 是精度隐患（当前量级 ~8.5e14 尚在 2^53 内，属未爆的雷）。
     receiverOptions.value = (list ?? []).map((it) => ({
       label: it.label || it.value,
-      value: Number(it.value)
+      value: String(it.value)
     }))
   } catch {
     receiverOptions.value = []
@@ -189,7 +190,7 @@ async function doSend(): Promise<void> {
   sending.value = true
   try {
     await sendMessage({
-      receiverIds: sendModel.receiverIds.map((v) => Number(v)),
+      receiverIds: sendModel.receiverIds,
       title: sendModel.title.trim(),
       content: sendModel.content.trim() || undefined
     })

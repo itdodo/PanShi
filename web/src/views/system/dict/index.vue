@@ -289,7 +289,7 @@ function openDataEdit(row: DictDataRow): void {
   dataForm.value = row.value
   dataForm.sort = row.sort
   dataForm.status = row.status
-  dataForm.tagType = row.tagType ?? 'default'
+  dataForm.tagType = tagTypeOf(row.tagType)
   dataForm.isDefault = !!row.isDefault
   dataForm.version = row.version
   dataModalVisible.value = true
