@@ -72,7 +72,12 @@ builder.Services.AddCors(cors => cors.AddPolicy("web", p => p
     .WithExposedHeaders("X-Captcha-Id", "Content-Disposition")));
 
 builder.Services.AddPanshiAuth(builder.Configuration);
-builder.Services.AddCaptcha();
+// 图形验证码只要「字符清楚可读」：关掉默认配置里的干扰线与气泡噪点（内部系统不需要对抗式难度）。
+builder.Services.AddCaptcha(o =>
+{
+    o.ImageOption.InterferenceLineCount = 0;
+    o.ImageOption.BubbleCount = 0;
+});
 builder.Services.AddSingleton<Panshi.Common.Cache.ICacheService, Panshi.Common.Cache.MemoryCacheService>();
 builder.Services.AddSingleton<FileStorage>();
 builder.Services.AddScoped<ConfigService>();
