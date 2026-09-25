@@ -11,7 +11,7 @@ import { FORCE_CHANGE_PWD_PATH } from '@/router'
 
 /**
  * 登录页：分屏品牌式（左深色品牌区 + 右表单），亮暗自适应，≤900px 隐藏品牌区。
- * 不预填账号密码；验证码点击刷新（blob + X-Captcha-Id）。
+ * 不预填账号密码；验证码点击刷新（blob + X-Captcha-Id），后端 X-Captcha-Enabled: 0 时整行隐藏。
  */
 const route = useRoute()
 const router = useRouter()
@@ -20,7 +20,7 @@ const user = useUserStore()
 const formRef = ref<FormInst | null>(null)
 const loading = ref(false)
 const model = reactive({ userName: '', password: '', captchaCode: '' })
-const captcha = reactive({ objectUrl: '', id: '', loading: false })
+const captcha = reactive({ enabled: true, objectUrl: '', id: '', loading: false })
 
 const rules: FormRules = {
   userName: [{ required: true, message: '请输入用户名', trigger: ['input', 'blur'] }],
@@ -36,10 +36,12 @@ async function refreshCaptcha(): Promise<void> {
   captcha.loading = true
   try {
     const result = await getCaptcha()
+    captcha.enabled = result.enabled
     captcha.objectUrl = result.objectUrl
     captcha.id = result.captchaId
   } catch {
-    // sys.captcha.enabled=0 或后端未就绪：留空即可，登录接口容忍空验证码
+    // 后端未就绪 / 接口失败：留空即可，登录接口容忍空验证码
+    captcha.enabled = true
     captcha.objectUrl = ''
     captcha.id = ''
   } finally {
@@ -167,7 +169,7 @@ function handleSubmit(): void {
           </NInput>
         </NFormItem>
 
-        <NFormItem label="验证码" path="captchaCode">
+        <NFormItem v-if="captcha.enabled" label="验证码" path="captchaCode">
           <div class="ps-login__captcha-row">
             <NInput
               v-model:value="model.captchaCode"
@@ -194,8 +196,8 @@ function handleSubmit(): void {
         <NButton type="primary" size="large" block :loading="loading" @click="handleSubmit"> 登 录 </NButton>
       </NForm>
 
-      <p class="ps-login__tip">
-        验证码可在后端参数 <code>sys.captcha.enabled</code> 关闭，关闭后留空即可登录。
+      <p v-if="captcha.enabled" class="ps-login__tip">
+        验证码可在后端参数 <code>sys.captcha.enabled</code> 关闭，关闭后本行自动隐藏。
       </p>
 
       <footer class="ps-login__foot">© 2026 磐石 Panshi · 企业内部系统</footer>

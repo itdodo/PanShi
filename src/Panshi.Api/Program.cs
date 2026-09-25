@@ -69,7 +69,7 @@ builder.Services.AddRateLimiter(rl =>
 builder.Services.AddCors(cors => cors.AddPolicy("web", p => p
     .WithOrigins(builder.Configuration.GetSection("Cors:Origins").Get<string[]>() ?? ["http://localhost:5173"])
     .AllowAnyHeader().AllowAnyMethod().AllowCredentials()
-    .WithExposedHeaders("X-Captcha-Id", "Content-Disposition")));
+    .WithExposedHeaders("X-Captcha-Id", "X-Captcha-Enabled", "Content-Disposition")));
 
 builder.Services.AddPanshiAuth(builder.Configuration);
 // 图形验证码只要「字符清楚可读」：关掉默认配置里的干扰线与气泡噪点（内部系统不需要对抗式难度）。

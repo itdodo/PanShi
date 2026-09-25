@@ -34,12 +34,20 @@ public class AuthController(
 
     private string Ua => Request.Headers.UserAgent.ToString();
 
-    /// <summary>图形验证码（Lazy.Captcha，内存存储；sys.captcha.enabled=0 时前端不显示）</summary>
+    /// <summary>
+    /// 图形验证码（Lazy.Captcha，内存存储）。
+    /// sys.captcha.enabled=0 时不生成图，直接 204 + X-Captcha-Enabled: 0，登录页据此隐藏整行——
+    /// 既省掉一次无用生成，也不在关闭状态下继续暴露一个可被刷的生成端点。
+    /// </summary>
     [HttpGet("captcha")]
     [AllowAnonymous]
     [EnableRateLimiting("captcha")]
-    public IActionResult Captcha()
+    public async Task<IActionResult> Captcha()
     {
+        var enabled = await config.GetBoolAsync("sys.captcha.enabled", true);
+        Response.Headers["X-Captcha-Enabled"] = enabled ? "1" : "0";
+        if (!enabled) return NoContent();
+
         var data = captcha.Generate(Guid.NewGuid().ToString("N"));
         Response.Headers["X-Captcha-Id"] = data.Id;
         return File(data.Bytes, "image/gif");

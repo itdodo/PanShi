@@ -98,8 +98,10 @@ export function kickSession(id: string): Promise<void> {
 /**
  * 图形验证码：image/gif 字节流 + 响应头 X-Captcha-Id（后端 WithExposedHeaders 已配）。
  * 返回 objectUrl 供 <img :src>，调用方负责 URL.revokeObjectURL 释放。
+ * sys.captcha.enabled=0 时后端回 204 + X-Captcha-Enabled: 0 且不生成图，此处 enabled=false，
+ * 调用方据此整行隐藏（别把空 Blob 做成 objectUrl，那会渲染出一张坏图）。
  */
-export async function getCaptcha(): Promise<{ objectUrl: string; captchaId: string }> {
+export async function getCaptcha(): Promise<{ enabled: boolean; objectUrl: string; captchaId: string }> {
   const resp = await rawRequest<Blob>({
     method: 'GET',
     url: '/auth/captcha',
@@ -107,6 +109,8 @@ export async function getCaptcha(): Promise<{ objectUrl: string; captchaId: stri
     responseType: 'blob',
     silent: true
   })
+  const enabled = String(resp.headers?.['x-captcha-enabled'] ?? '1') !== '0'
+  if (!enabled) return { enabled: false, objectUrl: '', captchaId: '' }
   const captchaId = String(resp.headers?.['x-captcha-id'] ?? '')
-  return { objectUrl: URL.createObjectURL(resp.data), captchaId }
+  return { enabled: true, objectUrl: URL.createObjectURL(resp.data), captchaId }
 }
