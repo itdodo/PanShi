@@ -17,8 +17,17 @@ public class MenuService(
     IRepository<SysUserRole> userRoleRepo,
     PermissionService permissions) : BaseService<SysMenu>(menuRepo)
 {
+    /// <summary>
+    /// 播种幂等哨兵（DbSeeder 里权限码为 __seed_v1__ 的那行按钮）：它只是「是否已播种」的标记，
+    /// 不是真实菜单。曾因为它出现在本树里，菜单管理多一条脏行、角色「授权菜单」能把它当权限授出去
+    /// （实测 sys_role_menu 会存入该 id），且可被误删导致重启重复播种。故在源头排除。
+    /// ⚠️ 必须显式带 == null 分支：SQL 里 permission &lt;&gt; x 对 NULL 行结果为 UNKNOWN，会把目录全过滤掉。
+    /// </summary>
+    public const string SeedSentinelPermission = "__seed_v1__";
+
     public async Task<List<MenuDto>> FullTreeAsync()
-        => BuildTree((await Repo.ListAsync()).OrderBy(m => m.Sort).ThenBy(m => m.Id).Select(ToDto).ToList());
+        => BuildTree((await Repo.ListAsync(m => m.Permission == null || m.Permission != SeedSentinelPermission))
+            .OrderBy(m => m.Sort).ThenBy(m => m.Id).Select(ToDto).ToList());
 
     /// <summary>我的菜单树（仅目录+菜单，按钮不进树；隐藏项保留 visible 由前端决定）。</summary>
     public async Task<List<MenuDto>> MyTreeAsync(long userId)
