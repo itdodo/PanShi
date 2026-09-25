@@ -14,7 +14,18 @@ export interface PageListOptions<T, Q> {
 
 export interface PageSorter {
   columnKey?: string | number | null
-  order?: 'asc' | 'desc' | false | null
+  /**
+   * ⚠️ NDataTable 表头给的是 'ascend' | 'descend' | false，不是后端的 'asc'/'desc'。
+   * 直接透传会让 ResolveSort 的 `desc = sortOrder != "asc"` 恒为真 —— 所有升序都退化成降序。
+   */
+  order?: 'ascend' | 'descend' | false | null
+}
+
+/** Naive 排序态 → 后端契约值（第三态 false/null = 取消排序，回默认排序） */
+function toApiSortOrder(order: PageSorter['order']): SortOrder | undefined {
+  if (order === 'ascend') return 'asc'
+  if (order === 'descend') return 'desc'
+  return undefined
 }
 
 export interface UsePageListReturn<T, Q> {
@@ -110,12 +121,13 @@ export function usePageList<T, Q extends Record<string, unknown> = Record<string
 
   function applySorter(sorter: PageSorter | PageSorter[] | null): Promise<void> {
     const single = Array.isArray(sorter) ? sorter[0] : sorter
-    if (!single || !single.columnKey || !single.order) {
+    const mapped = single?.columnKey ? toApiSortOrder(single.order) : undefined
+    if (!single?.columnKey || !mapped) {
       sortField.value = undefined
       sortOrder.value = undefined
     } else {
       sortField.value = String(single.columnKey)
-      sortOrder.value = single.order
+      sortOrder.value = mapped
     }
     pageNum.value = 1
     return load()
