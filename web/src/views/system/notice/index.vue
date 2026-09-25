@@ -31,10 +31,13 @@ import RichTextEditor from '@/components/RichTextEditor.vue'
 import { NOTICE_STATUS, NOTICE_STATUS_OPTIONS, NOTICE_TYPE_OPTIONS, noticeStatusTag, noticeTypeLabel, toNum } from '../_shared'
 
 /**
- * 公告管理（/sys/notice）：分页 + CRUD + 三态状态（0 停用 / 1 已发布 / 2 定时发布）。
+ * 公告管理（/sys/notice）：分页 + CRUD + 三态状态（0 停用/草稿 / 1 已发布 / 2 定时发布）。
  * 后端 NoticeDto = { id, title, noticeType, content, status, publishTime, createByName, createTime, version }；
  * 新增 POST /sys/notice、编辑 PUT /sys/notice/{id}（必带 version）、删除 DELETE /sys/notice/{id}。
- * 定时档校验「发布时间必须晚于当前时间」（后端 NoticeService 同规则兜底），到期由 sys.notice.publish 作业置为已发布。
+ * 交互：新建不出现「状态」单选，改由底部按钮直接表态——存草稿(0) / 立即发布(1) / 选了发布时间即定时发布(2)；
+ * 编辑仍保留状态单选（可把草稿转发布、把定时改回草稿等），「发布时间」仅在定时语义下出现并必填。
+ * 定时到期由后台作业 sys.notice.publish（cron * * * * *，每分钟）置 2→1；
+ * 「已发布且发布时间留空」由后端 Apply 自动补 now，故立即发布无需手填时间。
  * 正文用 wangEditor 富文本（红线 #10：弹层 after-enter 后才挂载编辑器）；详情渲染前经 DOMPurify 净化防 XSS。
  */
 type NoticeRow = {
@@ -72,7 +75,14 @@ const modalVisible = ref(false)
 const modalReady = ref(false)
 const saving = ref(false)
 const editing = computed(() => !!form.id)
-const isScheduled = computed(() => form.status === NOTICE_STATUS.Scheduled)
+/**
+ * 是否处于「定时发布」语义：
+ * 新建时看有没有选发布时间（选了=定时，没选=立即发布），编辑时看状态单选。
+ * 「必须晚于当前」这条规则只在定时语义下生效，否则编辑一条已发布公告会被自己过去的发布时间卡住。
+ */
+const scheduling = computed(() =>
+  editing.value ? form.status === NOTICE_STATUS.Scheduled : form.publishTime !== null
+)
 const formRef = ref<FormInst | null>(null)
 
 const form = reactive<NoticeFormModel>({
@@ -85,12 +95,15 @@ const form = reactive<NoticeFormModel>({
   version: 0
 })
 
+/** 新建时主按钮文案：选了时间就是定时发布 */
+const publishLabel = computed(() => (form.publishTime ? '定时发布' : '立即发布'))
+
 const rules = computed<FormRules>(() => ({
   title: [{ required: true, max: 256, message: '请输入公告标题', trigger: ['input', 'blur'] }],
   publishTime: [
     {
       validator: (_rule: unknown, value: number | null) => {
-        if (!isScheduled.value) return true
+        if (!scheduling.value) return true
         if (!value) return new Error('定时发布必须选择发布时间')
         if (value <= Date.now()) return new Error('定时发布时间必须晚于当前时间')
         return true
@@ -127,16 +140,22 @@ function openEdit(row: NoticeRow): void {
   modalVisible.value = true
 }
 
-async function submit(): Promise<boolean> {
+/**
+ * 提交。新建时状态由点的按钮决定（存草稿=0 / 立即发布=1 / 选了时间=定时2），编辑时沿用状态单选。
+ * 草稿不带发布时间，避免留下一条无意义的未来时间。
+ */
+async function submit(status?: number): Promise<boolean> {
   const invalid = await formRef.value?.validate().then(() => false).catch(() => true)
   if (invalid) return false
   saving.value = true
+  const nextStatus = status ?? form.status
+  const nextTime = nextStatus === NOTICE_STATUS.Stopped ? null : form.publishTime
   const payload = {
     title: form.title.trim(),
     noticeType: form.noticeType,
     content: form.content.trim() || null,
-    status: form.status,
-    publishTime: form.publishTime ? dayjs(form.publishTime).format('YYYY-MM-DDTHH:mm:ss') : null
+    status: nextStatus,
+    publishTime: nextTime ? dayjs(nextTime).format('YYYY-MM-DDTHH:mm:ss') : null
   }
   try {
     if (editing.value && form.id) {
@@ -144,15 +163,33 @@ async function submit(): Promise<boolean> {
       message.success('公告已保存')
     } else {
       await post('/sys/notice', payload)
-      message.success('公告已新增')
+      message.success(
+        nextStatus === NOTICE_STATUS.Published
+          ? '公告已发布'
+          : nextStatus === NOTICE_STATUS.Scheduled
+            ? '公告已排期，到点自动发布'
+            : '公告已存为草稿'
+      )
     }
     await list.load()
+    // 自定义 #action 后弹窗不再自动关闭（原先靠 dialog 预设的正按钮），成功即收起
+    modalVisible.value = false
     return true
   } catch {
     return false
   } finally {
     saving.value = false
   }
+}
+
+/** 新建·主按钮：选了发布时间即视为定时发布，否则立即发布 */
+function submitPublish(): Promise<boolean> {
+  return submit(form.publishTime ? NOTICE_STATUS.Scheduled : NOTICE_STATUS.Published)
+}
+
+/** 新建·存草稿 */
+function submitDraft(): Promise<boolean> {
+  return submit(NOTICE_STATUS.Stopped)
 }
 
 async function remove(row: NoticeRow): Promise<void> {
@@ -292,11 +329,8 @@ const columns = computed<DataTableColumns<NoticeRow>>(() => [
       v-model:show="modalVisible"
       preset="dialog"
       :title="editing ? '编辑公告' : '新增公告'"
-      :positive-text="editing ? '保存' : '创建'"
-      negative-text="取消"
       style="width: 720px"
-      :positive-button-props="{ loading: saving }"
-      @positive-click="submit"
+      :auto-focus="false"
       @after-enter="modalReady = true"
       @after-leave="resetForm"
     >
@@ -307,7 +341,8 @@ const columns = computed<DataTableColumns<NoticeRow>>(() => [
         <NFormItem label="类型" path="noticeType">
           <NSelect v-model:value="form.noticeType" :options="NOTICE_TYPE_OPTIONS" style="width: 160px" />
         </NFormItem>
-        <NFormItem label="状态" path="status">
+        <!-- 新建时用底部按钮表达意图（草稿/立即发布/定时），不再让状态单选和按钮重复表态 -->
+        <NFormItem v-if="editing" label="状态" path="status">
           <NRadioGroup v-model:value="form.status">
             <NSpace :size="16">
               <NRadio
@@ -319,23 +354,34 @@ const columns = computed<DataTableColumns<NoticeRow>>(() => [
             </NSpace>
           </NRadioGroup>
         </NFormItem>
-        <NFormItem v-if="isScheduled || form.status === NOTICE_STATUS.Published" label="发布时间" path="publishTime">
+        <NFormItem v-if="!editing || scheduling" label="发布时间" path="publishTime">
           <NDatePicker
             v-model:value="form.publishTime"
             type="datetime"
             clearable
-            :status="isScheduled ? 'error' : undefined"
             style="width: 240px"
             :is-date-disabled="(ts: number) => ts < Date.now() - 86400000"
           />
           <span class="ps-muted" style="margin-left: 10px; font-size: 12px">
-            {{ isScheduled ? '定时发布：到点由后台作业自动置为已发布，必须晚于当前时间' : '留空 = 保存即发布时间' }}
+            {{ editing ? '定时发布：到点由后台作业自动置为已发布，必须晚于当前时间' : '留空 = 立即发布；选时间 = 到点自动发布' }}
           </span>
         </NFormItem>
         <NFormItem label="正文" path="content">
           <RichTextEditor v-if="modalReady" v-model="form.content" :min-height="260" />
         </NFormItem>
       </NForm>
+      <template #action>
+        <NSpace :size="8">
+          <NButton :disabled="saving" tertiary @click="modalVisible = false">取消</NButton>
+          <template v-if="editing">
+            <NButton type="primary" :loading="saving" @click="submit()">保存</NButton>
+          </template>
+          <template v-else>
+            <NButton :disabled="saving" tertiary @click="submitDraft">存草稿</NButton>
+            <NButton type="primary" :loading="saving" @click="submitPublish">{{ publishLabel }}</NButton>
+          </template>
+        </NSpace>
+      </template>
     </NModal>
 
     <NModal
