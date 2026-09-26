@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using Panshi.Common.Json;
 
 namespace Panshi.Common.Security;
 
@@ -54,5 +55,13 @@ public static class SensitiveData
     public static string Truncate(string s, int max = 4000) =>
         s.Length <= max ? s : s[..max] + "...(truncated)";
 
-    public static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = false };
+    /// <summary>
+    /// 脱敏后回写 JSON 用。⚠️ 必须挂全局的中文友好编码器：这里是「序列化→解析→脱敏→再序列化」，
+    /// 用默认编码器会把上一步已还原的中文又转成 \uXXXX，操作日志/变更日志就又变回乱码形态。
+    /// </summary>
+    public static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        WriteIndented = false,
+        Encoder = JsonConfig.CjkFriendlyEncoder
+    };
 }
