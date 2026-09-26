@@ -173,7 +173,9 @@ async function customUpload({ file }: UploadCustomRequestOptions): Promise<void>
   uploading.value = true
   try {
     avatarFileId.value = await uploadAvatar(raw)
-    message.success('头像已上传，点击「保存资料」生效')
+    // /auth/avatar 服务端已当场写入 sys_user.avatar_file_id，重载 profile 即拿到新头像（无需再点保存）
+    await user.loadProfile(true)
+    message.success('头像已更新')
   } catch {
     /* 拦截器已提示 */
   } finally {
@@ -223,7 +225,7 @@ onMounted(async () => {
     <NCard :bordered="false">
       <template #header>
         <NSpace align="center" :size="12">
-          <NAvatar round :size="44" color="#2563eb">{{ (user.displayName || '?').slice(0, 1) }}</NAvatar>
+          <NAvatar round :size="44" :src="user.avatarUrl || undefined" color="#2563eb">{{ (user.displayName || '?').slice(0, 1) }}</NAvatar>
           <div>
             <div style="font-size: 16px; font-weight: 600">{{ user.displayName }}</div>
             <div class="ps-muted" style="font-size: 12px">
@@ -249,10 +251,11 @@ onMounted(async () => {
               </NFormItem>
               <NFormItem label="头像">
                 <NSpace align="center">
+                  <NAvatar round :size="32" :src="user.avatarUrl || undefined" color="#2563eb">{{ (user.displayName || '?').slice(0, 1) }}</NAvatar>
                   <NUpload :show-file-list="false" accept="image/png,image/jpeg,image/gif,image/webp" :custom-request="customUpload">
                     <NButton size="small" :loading="uploading">选择图片上传</NButton>
                   </NUpload>
-                  <span class="ps-muted">{{ avatarFileId ? '已上传，待保存' : '未修改' }}</span>
+                  <span class="ps-muted">{{ user.avatarUrl ? '已设置' : '未设置' }}</span>
                 </NSpace>
               </NFormItem>
               <NFormItem :show-label="false">
@@ -275,9 +278,14 @@ onMounted(async () => {
                   {{ formatDateTime(user.profile?.pwdUpdateTime) }}
                 </NDescriptionsItem>
               </NDescriptions>
-              <NAlert type="info" :bordered="false" style="margin-top: 14px" title="头像预览">
-                后端 ProfileDto 尚未回传 avatarFileId，暂无法显示当前头像（批次 #6 补齐后此处直接接 /file/download）。
-              </NAlert>
+              <div class="ps-profile__avatar-preview">
+                <div class="ps-profile__avatar-preview-title">头像预览</div>
+                <NAvatar v-if="user.avatarUrl" round :size="72" :src="user.avatarUrl" />
+                <NSpace v-else align="center" :size="8">
+                  <NAvatar round :size="72" color="#2563eb">{{ (user.displayName || '?').slice(0, 1) }}</NAvatar>
+                  <span class="ps-muted">尚未设置头像，上方显示的是昵称首字母</span>
+                </NSpace>
+              </div>
             </div>
           </div>
         </NTabPane>
@@ -342,5 +350,18 @@ onMounted(async () => {
 .ps-profile__side {
   flex: 1 1 320px;
   min-width: 300px;
+}
+
+.ps-profile__avatar-preview {
+  margin-top: 14px;
+  padding: 14px;
+  border: 1px solid var(--ps-card-border);
+  border-radius: 10px;
+}
+
+.ps-profile__avatar-preview-title {
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 10px;
 }
 </style>

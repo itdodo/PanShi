@@ -62,7 +62,7 @@ function confirmLogout(): void {
   >
     <template #trigger>
       <NButton text class="ps-user">
-        <NAvatar round :size="30" class="ps-user__avatar">{{ initial }}</NAvatar>
+        <NAvatar round :size="30" :src="user.avatarUrl || undefined" class="ps-user__avatar">{{ initial }}</NAvatar>
         <span class="ps-user__name ps-ellipsis">{{ user.displayName }}</span>
       </NButton>
     </template>

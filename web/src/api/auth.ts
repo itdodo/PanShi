@@ -30,6 +30,8 @@ export interface ProfileDto {
   permissions: string[]
   /** 内置管理员：permissions 已含全量权限码，前端无需特判 */
   isAdmin: boolean
+  /** 头像文件 Id；null=未设置。显示方式见 fetchFileBlobUrl（不能直接当 img src） */
+  avatarFileId?: string | null
   pwdUpdateTime: string
 }
 
@@ -84,6 +86,22 @@ export function changePassword(dto: ChangePasswordDto): Promise<void> {
 /** 头像上传（白名单 + magic bytes 嗅探，2MB），返回 sys_file Id（字符串） */
 export function uploadAvatar(file: File): Promise<string> {
   return upload<string>('/auth/avatar', file)
+}
+
+/**
+ * 取受 Bearer 保护的图片字节流并转成 objectURL（头像显示用）。
+ * ⚠️ 不能把 /file/{id}/download 直接塞进 <img src>：浏览器不会给图片请求带上
+ * Authorization 头，那个端点是 [Authorize] 的，结果就是 401 空图。
+ * 调用方负责 URL.revokeObjectURL 释放。
+ */
+export async function fetchFileBlobUrl(id: string): Promise<string> {
+  const resp = await rawRequest<Blob>({
+    method: 'GET',
+    url: `/file/${id}/download`,
+    responseType: 'blob',
+    silent: true
+  })
+  return URL.createObjectURL(resp.data)
 }
 
 export function listSessions(): Promise<SessionDto[]> {

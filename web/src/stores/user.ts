@@ -1,6 +1,6 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
-import { changePassword, getProfile, login as loginApi, logout as logoutApi, updateProfile } from '@/api/auth'
+import { changePassword, fetchFileBlobUrl, getProfile, login as loginApi, logout as logoutApi, updateProfile } from '@/api/auth'
 import type { ChangePasswordDto, LoginDto, LoginResultDto, ProfileDto, UpdateProfileDto } from '@/api/auth'
 import { tokenStore } from '@/utils/token'
 
@@ -32,12 +32,36 @@ export const useUserStore = defineStore('user', () => {
   }
   window.addEventListener('ps:token-refreshed', syncFromStorage)
 
+  /**
+   * 头像 objectURL（由 profile.avatarFileId 拉字节流生成）。
+   * 顶栏与个人中心直接绑 NAvatar 的 src；空串=没头像，退回显示首字母。
+   */
+  const avatarUrl = ref('')
+  let avatarLoadedId = ''
+
+  /** 幂等：id 没变就不重拉；失败清掉已记 id 以便下次重试 */
+  async function syncAvatar(): Promise<void> {
+    const id = profile.value?.avatarFileId ?? ''
+    if (id === avatarLoadedId) return
+    avatarLoadedId = id
+    const prev = avatarUrl.value
+    avatarUrl.value = ''
+    if (prev) URL.revokeObjectURL(prev)
+    if (!id) return
+    try {
+      avatarUrl.value = await fetchFileBlobUrl(id)
+    } catch {
+      avatarLoadedId = ''
+    }
+  }
+
   function applyProfile(p: ProfileDto): void {
     profile.value = p
     roles.value = p.roles ?? []
     permissions.value = p.permissions ?? []
     isAdmin.value = !!p.isAdmin
     loaded.value = true
+    void syncAvatar()
   }
 
   /** 清空登录态与派生路由/页签（动态 import 规避 store 间循环引用） */
@@ -50,6 +74,9 @@ export const useUserStore = defineStore('user', () => {
     isAdmin.value = false
     loaded.value = false
     mustChangePassword.value = false
+    if (avatarUrl.value) URL.revokeObjectURL(avatarUrl.value)
+    avatarUrl.value = ''
+    avatarLoadedId = ''
     tokenStore.clear()
     void Promise.all([import('./permission'), import('./tabs')]).then(([perm, tabs]) => {
       perm.usePermissionStore().reset()
@@ -124,10 +151,12 @@ export const useUserStore = defineStore('user', () => {
     userId,
     userName,
     displayName,
+    avatarUrl,
     login,
     logout,
     loadProfile,
     saveProfile,
+    syncAvatar,
     changePwd,
     applyProfile,
     resetAll,

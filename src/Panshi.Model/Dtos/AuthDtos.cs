@@ -58,6 +58,9 @@ public class ProfileDto
 
     public string? DeptName { get; set; }
 
+    /// <summary>头像文件 Id（雪花→字符串）；前端据此拉 /file/{id}/download 的字节流显示</summary>
+    public string? AvatarFileId { get; set; }
+
     public IReadOnlyList<string> Roles { get; set; } = Array.Empty<string>();
 
     public IReadOnlyList<string> Permissions { get; set; } = Array.Empty<string>();

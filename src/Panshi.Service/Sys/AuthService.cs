@@ -220,6 +220,7 @@ public class AuthService(
         {
             Id = user.Id.ToString(), UserName = user.UserName, NickName = user.NickName,
             Phone = user.Phone, Email = user.Email, DeptName = deptName,
+            AvatarFileId = user.AvatarFileId?.ToString(),
             Roles = roles, Permissions = permissions,
             IsAdmin = user.UserName == AdminUserName,
             PwdUpdateTime = user.PwdUpdateTime
