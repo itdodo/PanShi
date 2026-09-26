@@ -53,6 +53,32 @@ public class DataScopeService(
     }
 
     /// <summary>
+    /// 日志类表（只有 user_name，没有 DeptId/OwnerUserId，走不了 Filter&lt;T&gt;）的数据权限：
+    /// 把五档翻成「可见用户名集合」。返回 null = 不过滤（超管或 All 档）。
+    /// ⚠️ 非 All 档因此看不到「不属于任何用户」的行（如撞库不存在的账号产生的失败登录）——保守取舍，宁少不漏。
+    /// </summary>
+    public async Task<List<string>?> VisibleUserNamesAsync(long userId)
+    {
+        var ctx = await ResolveAsync(userId);
+        if (ctx is null) return null;
+        return (await userRepo.ListAsync())
+            .Where(u => UserInScope(ctx, u))
+            .Select(u => u.UserName)
+            .Distinct()
+            .ToList();
+    }
+
+    /// <summary>某个用户行是否落在 ctx 的可见范围内（用户列表与日志可见名集合共用这一份判定）。</summary>
+    public static bool UserInScope(ScopeCtx ctx, SysUser u) => ctx.Best switch
+    {
+        DataScopeType.Self => u.OwnerUserId == ctx.UserId,
+        DataScopeType.Dept => u.DeptId == (ctx.DeptId ?? -1),
+        DataScopeType.DeptAndChild => u.DeptId is long d1 && ctx.DeptIds.Contains(d1),
+        DataScopeType.Custom => u.DeptId is long d2 && ctx.DeptIds.Contains(d2),
+        _ => true
+    };
+
+    /// <summary>
     /// 构建过滤表达式（ctx=null 恒真）。只允许常量比较，满足 SqlSugar 翻译。
     /// ⚠️ 必须用「具体实体属性」而非 IDataScope 接口成员构造表达式：泛型约束 T : IDataScope 下
     /// `it => it.OwnerUserId` 会绑定到接口属性，SqlSugar 取不到实体列映射 → 拼成 owneruserid(缺下划线) → PG 42703。

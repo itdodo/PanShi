@@ -50,7 +50,7 @@ public class UserService(
         var page = await Repo.PageAsync(exp.ToExpression(), query.PageNum, query.PageSize, col, desc);
 
         // ctx 非空时按最宽档后置过滤（分页总数保持库侧值）
-        var rows = ctx is null ? page.Rows : page.Rows.Where(u => InScope(ctx, u)).ToList();
+        var rows = ctx is null ? page.Rows : page.Rows.Where(u => DataScopeService.UserInScope(ctx, u)).ToList();
 
         var deptNames = (await deptRepo.ListAsync()).ToDictionary(x => x.Id, x => x.DeptName);
         var ids = rows.Select(u => u.Id).ToHashSet();
@@ -328,15 +328,6 @@ Array.Empty<UserImportRow>()
 
         return result;
     }
-
-    private static bool InScope(ScopeCtx ctx, SysUser u) => ctx.Best switch
-    {
-        DataScopeType.Self => u.OwnerUserId == ctx.UserId,
-        DataScopeType.Dept => u.DeptId == (ctx.DeptId ?? -1),
-        DataScopeType.DeptAndChild => u.DeptId is long d1 && ctx.DeptIds.Contains(d1),
-        DataScopeType.Custom => u.DeptId is long d2 && ctx.DeptIds.Contains(d2),
-        _ => true
-    };
 
     /// <summary>⚠️ 手工映射：新增乐观锁/审计字段必须逐列核对（红线 #6）。</summary>
     private static UserDto ToDto(SysUser u, IReadOnlyDictionary<long, string> deptNames,

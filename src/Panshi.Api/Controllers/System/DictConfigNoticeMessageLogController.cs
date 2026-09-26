@@ -154,14 +154,17 @@ public class MessageController(MessageService messages) : ControllerBase
 [Tags("系统-日志")]
 public class LogController(LogService logs) : ControllerBase
 {
+    /// <summary>日志三表都没有部门/归属列，数据权限一律按「当前查看者」解析（超管=不过滤）。</summary>
+    private long Uid => HttpContext.CurrentUserId();
+
     [HttpGet("operation")]
     [HasPermission("monitor:operlog:list")]
-    public async Task<PagedResult<OperLogDto>> Operation([FromQuery] OperLogQuery query) => await logs.OperPageAsync(query);
+    public async Task<PagedResult<OperLogDto>> Operation([FromQuery] OperLogQuery query) => await logs.OperPageAsync(query, Uid);
 
     [HttpGet("operation/export")]
     [HasPermission("monitor:operlog:export")]
     public async Task<IActionResult> OperationExport([FromQuery] OperLogQuery query)
-        => File(await logs.OperExportBytesAsync(query), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "操作日志.xlsx");
+        => File(await logs.OperExportBytesAsync(query, Uid), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "操作日志.xlsx");
 
     [HttpDelete("operation/cleanup")]
     [HasPermission("monitor:operlog:clean")]
@@ -169,12 +172,12 @@ public class LogController(LogService logs) : ControllerBase
 
     [HttpGet("login")]
     [HasPermission("monitor:loginlog:list")]
-    public async Task<PagedResult<LoginLogDto>> Login([FromQuery] LoginLogQuery query) => await logs.LoginPageAsync(query);
+    public async Task<PagedResult<LoginLogDto>> Login([FromQuery] LoginLogQuery query) => await logs.LoginPageAsync(query, Uid);
 
     [HttpGet("login/export")]
     [HasPermission("monitor:loginlog:export")]
     public async Task<IActionResult> LoginExport([FromQuery] LoginLogQuery query)
-        => File(await logs.LoginExportBytesAsync(query), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "登录日志.xlsx");
+        => File(await logs.LoginExportBytesAsync(query, Uid), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "登录日志.xlsx");
 
     [HttpDelete("login/cleanup")]
     [HasPermission("monitor:loginlog:clean")]
@@ -182,7 +185,7 @@ public class LogController(LogService logs) : ControllerBase
 
     [HttpGet("change")]
     [HasPermission("monitor:changelog:list")]
-    public async Task<PagedResult<ChangeLogDto>> Change([FromQuery] ChangeLogQuery query) => await logs.ChangePageAsync(query);
+    public async Task<PagedResult<ChangeLogDto>> Change([FromQuery] ChangeLogQuery query) => await logs.ChangePageAsync(query, Uid);
 
     [HttpDelete("change/cleanup")]
     [HasPermission("monitor:changelog:clean")]
