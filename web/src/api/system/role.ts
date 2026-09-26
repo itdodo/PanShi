@@ -1,7 +1,11 @@
 import { del, get, post, put } from '../../api/http'
 import type { PageQuery, PagedResult, VoidResult } from '../../api/types'
+import type { Option } from '../admin'
 
-/** 角色管理（/sys/role）契约预声明 */
+/**
+ * 角色管理（/sys/role）。已授权的 menuIds/deptIds 由 GET /sys/role/{id} 一并回传
+ * （后端没有 /menu-ids、/dept-ids 这类单独端点，别照着旧预声明找）。
+ */
 export interface RoleDto {
   id: string
   roleCode: string
@@ -37,9 +41,9 @@ export function pageRoles(query: RoleQuery): Promise<PagedResult<RoleDto>> {
   return get<PagedResult<RoleDto>>('/sys/role/page', query)
 }
 
-/** 下拉用全量启用角色 */
-export function listRoles(): Promise<RoleDto[]> {
-  return get<RoleDto[]>('/sys/role/list')
+/** 下拉用全量启用角色：后端是 List<OptionDto>，不是 RoleDto[] */
+export function listRoles(): Promise<Option[]> {
+  return get<Option[]>('/sys/role/list')
 }
 
 export function getRole(id: string): Promise<RoleDto> {
@@ -50,18 +54,19 @@ export function createRole(dto: RoleFormDto): Promise<string> {
   return post<string>('/sys/role', dto)
 }
 
-export function updateRole(dto: RoleFormDto): Promise<VoidResult> {
-  return put<VoidResult>('/sys/role', dto)
+/** 后端是 [HttpPut("{id:long}")]，路径必须带 id；已授权菜单/部门随 RoleUpdateDto 一起回传 */
+export function updateRole(id: string, dto: RoleFormDto): Promise<VoidResult> {
+  return put<VoidResult>(`/sys/role/${id}`, dto)
 }
 
 export function deleteRole(id: string): Promise<VoidResult> {
   return del<VoidResult>(`/sys/role/${id}`)
 }
 
-export function getRoleMenuIds(id: string): Promise<string[]> {
-  return get<string[]>(`/sys/role/${id}/menu-ids`)
-}
-
-export function getRoleDeptIds(id: string): Promise<string[]> {
-  return get<string[]>(`/sys/role/${id}/dept-ids`)
+/** 单独授权（不动基础信息，故不需要 version） */
+export function grantRoleMenus(
+  id: string,
+  dto: { menuIds: string[]; dataScope?: number; deptIds?: string[] }
+): Promise<VoidResult> {
+  return post<VoidResult>(`/sys/role/${id}/menus`, dto)
 }

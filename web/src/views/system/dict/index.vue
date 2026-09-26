@@ -30,7 +30,7 @@ import { STATUS_OPTIONS, TAG_TYPE_OPTIONS, idForApi, statusTag, tagTypeOf, toNum
  * 字典管理（/sys/dict）：左「字典类型」分页表 + 右「字典数据项」表（选中类型后加载
  * GET /sys/dict/data/type/{typeId}），两栏各自 CRUD。
  * 后端 DTO：DictTypeDto{dictName,dictCode,remark,version} / DictDataDto{dictTypeId,label,value,sort,status,tagType,isDefault,version}
- * ——与 api/system/dict.ts 的预声明字段名不同（那边写的是 dictType/dictValue），故按真实契约直调 http。
+ * ——视图按该真实契约直调 http（api/system/dict.ts 的声明已同步为同一字段名，接入与否另议）。
  */
 type DictTypeRow = {
   id: string

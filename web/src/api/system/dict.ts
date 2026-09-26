@@ -1,18 +1,21 @@
 import { del, get, post, put } from '../../api/http'
 import type { PageQuery, PagedResult, VoidResult } from '../../api/types'
 
-/** 字典（/sys/dict：类型 + 数据项）契约预声明 */
+/**
+ * 字典管理（/sys/dict：类型 + 数据项）。后端 PUT 一律带 {id}；
+ * 类型编码是 dictCode、数据项是 label/value（不是 dictType/dictLabel/dictValue）。
+ */
+/** 后端字段：编码是 dictCode，且没有 status */
 export interface DictTypeDto {
   id: string
-  dictType: string
+  dictCode: string
   dictName: string
-  status?: number
   remark?: string | null
   createTime: string
   version: number
 }
 
-/** 后端 DictDataDto：{ id, dictTypeId, label, value, sort, status, tagType, version }（字段名不是 dictLabel/dictValue） */
+/** 后端 DictDataDto：{ id, dictTypeId, label, value, sort, status, tagType, isDefault, version }（字段名不是 dictLabel/dictValue） */
 export interface DictItemDto {
   id: string
   dictTypeId: string
@@ -22,7 +25,7 @@ export interface DictItemDto {
   tagType?: string | null
   sort: number
   status: number
-  remark?: string | null
+  isDefault?: boolean
   version?: number
 }
 
@@ -39,8 +42,8 @@ export function createDictType(dto: Partial<DictTypeDto>): Promise<string> {
   return post<string>('/sys/dict/type', dto)
 }
 
-export function updateDictType(dto: Partial<DictTypeDto>): Promise<VoidResult> {
-  return put<VoidResult>('/sys/dict/type', dto)
+export function updateDictType(id: string, dto: Partial<DictTypeDto>): Promise<VoidResult> {
+  return put<VoidResult>(`/sys/dict/type/${id}`, dto)
 }
 
 export function deleteDictType(id: string): Promise<VoidResult> {
@@ -51,8 +54,8 @@ export function createDictItem(dto: Partial<DictItemDto>): Promise<string> {
   return post<string>('/sys/dict/data', dto)
 }
 
-export function updateDictItem(dto: Partial<DictItemDto>): Promise<VoidResult> {
-  return put<VoidResult>('/sys/dict/data', dto)
+export function updateDictItem(id: string, dto: Partial<DictItemDto>): Promise<VoidResult> {
+  return put<VoidResult>(`/sys/dict/data/${id}`, dto)
 }
 
 export function deleteDictItem(id: string): Promise<VoidResult> {

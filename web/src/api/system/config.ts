@@ -18,8 +18,9 @@ export function pageConfigs(query: PageQuery & { keyword?: string }): Promise<Pa
   return get<PagedResult<ConfigDto>>('/sys/config/page', query)
 }
 
-export function updateConfig(dto: Partial<ConfigDto>): Promise<VoidResult> {
-  return put<VoidResult>('/sys/config', dto)
+/** 后端是 [HttpPut("{id:long}")]，路径必须带 id；dto 需含 version（乐观锁） */
+export function updateConfig(id: string, dto: Partial<ConfigDto>): Promise<VoidResult> {
+  return put<VoidResult>(`/sys/config/${id}`, dto)
 }
 
 export function createConfig(dto: Partial<ConfigDto>): Promise<string> {

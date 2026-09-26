@@ -40,7 +40,7 @@ import { STATUS_OPTIONS, pruneChildren, statusTag, toId, toIds, toNum, toStrIds,
  * 契约以已联调后端为准：列表 pageUsers；新增 POST /sys/user；编辑 PUT /sys/user/{id}（必带 version）；
  * 删除 DELETE /sys/user/{id}；重置密码 POST /sys/user/{id}/password/reset（回传初始密码）；
  * 导入 POST /sys/user/import(multipart file) / 模板 GET /sys/user/import-template / 导出 GET /sys/user/export。
- * src/api/system/user.ts 里的 update/delete/reset 预声明地址与后端不一致，按规约在视图内直调 http。
+ * 视图内这几类动作直调 http（api/system/user.ts 的声明已同步为同一契约，接入与否另议）。
  */
 type UserRow = UserDto & { roleIds?: string[]; positionIds?: string[] }
 type UserQueryModel = {
