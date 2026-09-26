@@ -225,7 +225,9 @@ onMounted(async () => {
     <NCard :bordered="false">
       <template #header>
         <NSpace align="center" :size="12">
-          <NAvatar round :size="44" :src="user.avatarUrl || undefined" color="#2563eb">{{ (user.displayName || '?').slice(0, 1) }}</NAvatar>
+          <!-- NAvatar 的默认插槽与 src 互斥：有图/无图分两支（详见 UserActions 注释） -->
+          <NAvatar v-if="user.avatarUrl" round :size="44" :src="user.avatarUrl" />
+          <NAvatar v-else round :size="44" color="#2563eb">{{ (user.displayName || '?').slice(0, 1) }}</NAvatar>
           <div>
             <div style="font-size: 16px; font-weight: 600">{{ user.displayName }}</div>
             <div class="ps-muted" style="font-size: 12px">
@@ -251,7 +253,8 @@ onMounted(async () => {
               </NFormItem>
               <NFormItem label="头像">
                 <NSpace align="center">
-                  <NAvatar round :size="32" :src="user.avatarUrl || undefined" color="#2563eb">{{ (user.displayName || '?').slice(0, 1) }}</NAvatar>
+                  <NAvatar v-if="user.avatarUrl" round :size="32" :src="user.avatarUrl" />
+                  <NAvatar v-else round :size="32" color="#2563eb">{{ (user.displayName || '?').slice(0, 1) }}</NAvatar>
                   <NUpload :show-file-list="false" accept="image/png,image/jpeg,image/gif,image/webp" :custom-request="customUpload">
                     <NButton size="small" :loading="uploading">选择图片上传</NButton>
                   </NUpload>

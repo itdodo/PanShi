@@ -62,7 +62,10 @@ function confirmLogout(): void {
   >
     <template #trigger>
       <NButton text class="ps-user">
-        <NAvatar round :size="30" :src="user.avatarUrl || undefined" class="ps-user__avatar">{{ initial }}</NAvatar>
+        <!-- ⚠️ NAvatar 的默认插槽与 src 互斥（源码：有 slot children 就只渲染文字、永不渲染 img），
+             所以有头像/无头像必须两支分开渲染，不能写成「src + 插槽兜底」。 -->
+        <NAvatar v-if="user.avatarUrl" round :size="30" :src="user.avatarUrl" class="ps-user__avatar" />
+        <NAvatar v-else round :size="30" class="ps-user__avatar">{{ initial }}</NAvatar>
         <span class="ps-user__name ps-ellipsis">{{ user.displayName }}</span>
       </NButton>
     </template>
