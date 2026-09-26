@@ -24,9 +24,16 @@ import {
   type TreeOption,
   type UploadCustomRequestOptions
 } from 'naive-ui'
-import { del, download, post, put, upload } from '@/api/http'
+import { download, upload } from '@/api/http'
 import { errorText } from '@/api/types'
-import { pageUsers, type UserDto } from '@/api/system/user'
+import {
+  createUser,
+  deleteUser,
+  pageUsers,
+  resetPassword as resetUserPassword,
+  updateUser,
+  type UserDto
+} from '@/api/system/user'
 import { getDeptTree } from '@/api/system/dept'
 import { positionOptions, roleOptions, type Option } from '@/api/admin'
 import { usePageList } from '@/composables/usePageList'
@@ -195,10 +202,10 @@ async function submit(): Promise<boolean> {
   }
   try {
     if (editing.value && form.id) {
-      await put(`/sys/user/${form.id}`, { ...payload, version: form.version })
+      await updateUser(form.id, { ...payload, version: form.version })
       message.success('用户已保存')
     } else {
-      await post('/sys/user', {
+      await createUser({
         ...payload,
         userName: form.userName.trim(),
         password: form.password || undefined
@@ -217,7 +224,7 @@ async function submit(): Promise<boolean> {
 
 async function remove(row: UserRow): Promise<void> {
   try {
-    await del(`/sys/user/${row.id}`)
+    await deleteUser(row.id)
     message.success('已删除')
     await list.load()
   } catch {
@@ -228,7 +235,7 @@ async function remove(row: UserRow): Promise<void> {
 /* ------------------------------- 重置密码 ------------------------------- */
 async function resetPassword(row: UserRow): Promise<void> {
   try {
-    const pwd = await post<string>(`/sys/user/${row.id}/password/reset`)
+    const pwd = await resetUserPassword(row.id)
     dialog.info({
       title: `已重置 ${row.userName} 的密码`,
       content: `初始密码：${pwd}（仅本次显示，请及时通知本人修改）`,

@@ -19,8 +19,18 @@ import {
   type FormInst,
   type FormRules
 } from 'naive-ui'
-import { del, get, post, put } from '@/api/http'
-import type { PagedResult } from '@/api/types'
+import {
+  createDictItem,
+  createDictType,
+  deleteDictItem,
+  deleteDictType,
+  getDictDataByType,
+  pageDictTypes,
+  updateDictItem,
+  updateDictType,
+  type DictItemDto,
+  type DictTypeDto
+} from '@/api/system/dict'
 import { usePageList } from '@/composables/usePageList'
 import { hasPerm } from '@/directives/permission'
 import { message } from '@/utils/feedback'
@@ -32,32 +42,15 @@ import { STATUS_OPTIONS, TAG_TYPE_OPTIONS, idForApi, statusTag, tagTypeOf, toNum
  * 后端 DTO：DictTypeDto{dictName,dictCode,remark,version} / DictDataDto{dictTypeId,label,value,sort,status,tagType,isDefault,version}
  * ——视图按该真实契约直调 http（api/system/dict.ts 的声明已同步为同一字段名，接入与否另议）。
  */
-type DictTypeRow = {
-  id: string
-  dictName: string
-  dictCode: string
-  remark?: string | null
-  createTime: string
-  version: number
-}
+type DictTypeRow = DictTypeDto
 
-type DictDataRow = {
-  id: string
-  dictTypeId: string
-  label: string
-  value: string
-  sort: number
-  status: number
-  tagType?: string | null
-  isDefault: boolean
-  version: number
-}
+type DictDataRow = DictItemDto
 
 type TypeQueryModel = { keyword: string }
 
 /* -------------------------------- 左侧：类型 -------------------------------- */
 const typeList = usePageList<DictTypeRow, TypeQueryModel>({
-  fetcher: (q) => get<PagedResult<DictTypeRow>>('/sys/dict/type/page', q),
+  fetcher: pageDictTypes,
   defaultQuery: () => ({ keyword: '' }),
   pageSize: 10
 })
@@ -155,10 +148,10 @@ async function submitType(): Promise<boolean> {
   }
   try {
     if (typeEditing.value && typeForm.id) {
-      await put(`/sys/dict/type/${typeForm.id}`, { ...payload, version: typeForm.version })
+      await updateDictType(typeForm.id, { ...payload, version: typeForm.version })
       message.success('字典类型已保存')
     } else {
-      await post('/sys/dict/type', payload)
+      await createDictType(payload)
       message.success('字典类型已新增')
     }
     await typeList.load()
@@ -172,7 +165,7 @@ async function submitType(): Promise<boolean> {
 
 async function removeType(row: DictTypeRow): Promise<void> {
   try {
-    await del(`/sys/dict/type/${row.id}`)
+    await deleteDictType(row.id)
     if (selectedType.value?.id === row.id) {
       selectedType.value = null
       dataItems.value = []
@@ -191,7 +184,7 @@ const dataLoading = ref(false)
 async function loadDataItems(typeId: string): Promise<void> {
   dataLoading.value = true
   try {
-    dataItems.value = (await get<DictDataRow[]>(`/sys/dict/data/type/${typeId}`)) ?? []
+    dataItems.value = (await getDictDataByType(typeId)) ?? []
   } catch {
     dataItems.value = []
   } finally {
@@ -315,10 +308,10 @@ async function submitDataItem(): Promise<boolean> {
   }
   try {
     if (dataEditing.value && dataForm.id) {
-      await put(`/sys/dict/data/${dataForm.id}`, { ...payload, version: dataForm.version })
+      await updateDictItem(dataForm.id, { ...payload, version: dataForm.version })
       message.success('数据项已保存')
     } else {
-      await post('/sys/dict/data', payload)
+      await createDictItem(payload)
       message.success('数据项已新增')
     }
     await loadDataItems(type.id)
@@ -333,7 +326,7 @@ async function submitDataItem(): Promise<boolean> {
 async function removeDataItem(row: DictDataRow): Promise<void> {
   const type = selectedType.value
   try {
-    await del(`/sys/dict/data/${row.id}`)
+    await deleteDictItem(row.id)
     message.success('已删除')
     if (type) await loadDataItems(type.id)
   } catch {

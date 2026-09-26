@@ -27,8 +27,8 @@ export interface RoleFormDto {
   status: number
   sort?: number
   remark?: string | null
-  menuIds?: string[]
-  deptIds?: string[]
+  menuIds?: (string | number)[]
+  deptIds?: (string | number)[]
   version?: number
 }
 
@@ -66,7 +66,7 @@ export function deleteRole(id: string): Promise<VoidResult> {
 /** 单独授权（不动基础信息，故不需要 version） */
 export function grantRoleMenus(
   id: string,
-  dto: { menuIds: string[]; dataScope?: number; deptIds?: string[] }
+  dto: { menuIds: (string | number)[]; dataScope?: number; deptIds?: (string | number)[] }
 ): Promise<VoidResult> {
   return post<VoidResult>(`/sys/role/${id}/menus`, dto)
 }

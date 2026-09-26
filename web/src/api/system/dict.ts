@@ -26,7 +26,7 @@ export interface DictItemDto {
   sort: number
   status: number
   isDefault?: boolean
-  version?: number
+  version: number
 }
 
 export function pageDictTypes(query: PageQuery & { keyword?: string }): Promise<PagedResult<DictTypeDto>> {
@@ -36,6 +36,11 @@ export function pageDictTypes(query: PageQuery & { keyword?: string }): Promise<
 /** 按类型取启用字典项（表单下拉/标签渲染高频接口，失败静默） */
 export function getDictItems(dictType: string): Promise<DictItemDto[]> {
   return get<DictItemDto[]>(`/sys/dict/data/${dictType}`, undefined, { silent: true })
+}
+
+/** 按类型 id 取数据项（管理端右栏，需 sys:dict:list） */
+export function getDictDataByType(typeId: string): Promise<DictItemDto[]> {
+  return get<DictItemDto[]>(`/sys/dict/data/type/${typeId}`)
 }
 
 export function createDictType(dto: Partial<DictTypeDto>): Promise<string> {
@@ -50,11 +55,26 @@ export function deleteDictType(id: string): Promise<VoidResult> {
   return del<VoidResult>(`/sys/dict/type/${id}`)
 }
 
-export function createDictItem(dto: Partial<DictItemDto>): Promise<string> {
+/**
+ * 新增/编辑数据项的载荷。后端 DictDataSaveDto.DictTypeId 是 long，
+ * 全局 NumberHandling.AllowReadingFromString 让字符串与数字都能绑定（雪花 id 走字符串防丢精度）。
+ */
+export interface DictItemFormDto {
+  dictTypeId: string | number
+  label: string
+  value: string
+  sort?: number
+  status?: number
+  tagType?: string | null
+  isDefault?: boolean
+  version?: number
+}
+
+export function createDictItem(dto: DictItemFormDto): Promise<string> {
   return post<string>('/sys/dict/data', dto)
 }
 
-export function updateDictItem(id: string, dto: Partial<DictItemDto>): Promise<VoidResult> {
+export function updateDictItem(id: string, dto: DictItemFormDto): Promise<VoidResult> {
   return put<VoidResult>(`/sys/dict/data/${id}`, dto)
 }
 

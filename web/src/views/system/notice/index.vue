@@ -21,8 +21,7 @@ import {
   type FormInst,
   type FormRules
 } from 'naive-ui'
-import { del, get, post, put } from '@/api/http'
-import type { PagedResult } from '@/api/types'
+import { createNotice, deleteNotice, pageNotices, updateNotice, type NoticeDto } from '@/api/notice'
 import { usePageList } from '@/composables/usePageList'
 import { hasPerm } from '@/directives/permission'
 import { message } from '@/utils/feedback'
@@ -40,17 +39,7 @@ import { NOTICE_STATUS, NOTICE_STATUS_OPTIONS, NOTICE_TYPE_OPTIONS, noticeStatus
  * 「已发布且发布时间留空」由后端 Apply 自动补 now，故立即发布无需手填时间。
  * 正文用 wangEditor 富文本（红线 #10：弹层 after-enter 后才挂载编辑器）；详情渲染前经 DOMPurify 净化防 XSS。
  */
-type NoticeRow = {
-  id: string
-  title: string
-  noticeType: number
-  content?: string | null
-  status: number
-  publishTime?: string | null
-  createByName?: string | null
-  createTime: string
-  version: number
-}
+type NoticeRow = NoticeDto
 
 type NoticeQueryModel = { title: string; noticeType: number | null; status: number | null }
 
@@ -66,7 +55,7 @@ type NoticeFormModel = {
 }
 
 const list = usePageList<NoticeRow, NoticeQueryModel>({
-  fetcher: (q) => get<PagedResult<NoticeRow>>('/sys/notice/page', q),
+  fetcher: pageNotices,
   defaultQuery: () => ({ title: '', noticeType: null, status: null })
 })
 
@@ -159,10 +148,10 @@ async function submit(status?: number): Promise<boolean> {
   }
   try {
     if (editing.value && form.id) {
-      await put(`/sys/notice/${form.id}`, { ...payload, version: form.version })
+      await updateNotice(form.id, { ...payload, version: form.version })
       message.success('公告已保存')
     } else {
-      await post('/sys/notice', payload)
+      await createNotice(payload)
       message.success(
         nextStatus === NOTICE_STATUS.Published
           ? '公告已发布'
@@ -194,7 +183,7 @@ function submitDraft(): Promise<boolean> {
 
 async function remove(row: NoticeRow): Promise<void> {
   try {
-    await del(`/sys/notice/${row.id}`)
+    await deleteNotice(row.id)
     message.success('已删除')
     await list.load()
   } catch {

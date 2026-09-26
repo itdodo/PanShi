@@ -23,8 +23,16 @@ import {
   type FormRules,
   type TreeOption
 } from 'naive-ui'
-import { put } from '@/api/http'
-import { createMenu, deleteMenu, getFullMenuTree, MENU_TYPE, type MenuFormDto, type MenuTreeNode, type MenuTypeValue } from '@/api/menu'
+import {
+  createMenu,
+  deleteMenu,
+  getFullMenuTree,
+  MENU_TYPE,
+  updateMenu,
+  type MenuFormDto,
+  type MenuTreeNode,
+  type MenuTypeValue
+} from '@/api/menu'
 import { hasPerm } from '@/directives/permission'
 import { message } from '@/utils/feedback'
 import { flattenTree, menuTypeTag, pruneChildren, statusTag, toId, toTreeOptions } from '../_shared'
@@ -233,8 +241,7 @@ async function submit(): Promise<boolean> {
   const dto = buildDto()
   try {
     if (editing.value && form.id) {
-      // 后端 PUT /sys/menu/{id}（声明式 updateMenu 地址少一段 id，故直调）
-      await put(`/sys/menu/${form.id}`, { ...dto, version: form.version })
+      await updateMenu({ ...dto, id: form.id, version: form.version })
       message.success('菜单已保存')
     } else {
       await createMenu(dto)

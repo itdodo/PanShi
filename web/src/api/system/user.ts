@@ -32,13 +32,17 @@ export interface UserFormDto {
   email?: string | null
   status: number
   deptId?: string | null
-  positionIds?: string[]
-  roleIds?: string[]
+  positionIds?: (string | number)[]
+  roleIds?: (string | number)[]
   remark?: string | null
   version?: number
 }
 
-/** 后端 UserUpdateDto：登录名与口令不在此列（改密走 reset，登录名建好即固定） */
+/**
+ * 后端 UserUpdateDto：登录名与口令不在此列（改密走 reset，登录名建好即固定）。
+ * id 数组用 string | number —— 视图侧 toIds() 只在「安全整数且字面量等价」时转数字，
+ * 雪花 id 保留字符串防丢精度；后端全局 AllowReadingFromString，两种都吃。
+ */
 export interface UserUpdateDto {
   nickName: string
   phone?: string | null
@@ -46,8 +50,8 @@ export interface UserUpdateDto {
   deptId?: string | null
   status: number
   remark?: string | null
-  roleIds?: string[]
-  positionIds?: string[]
+  roleIds?: (string | number)[]
+  positionIds?: (string | number)[]
   version: number
 }
 

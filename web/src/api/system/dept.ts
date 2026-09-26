@@ -15,7 +15,7 @@ export interface DeptTreeNode {
   sort: number
   status: number
   version: number
-  createTime?: string
+  createTime: string
   children?: DeptTreeNode[] | null
 }
 

@@ -21,8 +21,7 @@ import {
   type FormRules,
   type TreeOption
 } from 'naive-ui'
-import { get, post, put } from '@/api/http'
-import { deleteDept } from '@/api/system/dept'
+import { createDept, deleteDept, getDeptTree, updateDept, type DeptTreeNode } from '@/api/system/dept'
 import { userOptions, type Option } from '@/api/admin'
 import { hasPerm } from '@/directives/permission'
 import { message } from '@/utils/feedback'
@@ -33,19 +32,7 @@ import { flattenTree, pruneChildren, statusTag, toId, toTreeOptions } from '../_
  * 后端返回 DeptDto：{id,parentId,deptCode,deptName,leader,leaderUserId,sort,status,children[],createTime,version}，
  * 编辑 PUT /sys/dept/{id}（DeptSaveDto 含 version）；新增 POST /sys/dept；删除 DELETE /sys/dept/{id}。
  */
-type DeptRow = {
-  id: string
-  parentId: string | null
-  deptCode: string
-  deptName: string
-  leader?: string | null
-  leaderUserId?: string | null
-  sort: number
-  status: number
-  createTime?: string | null
-  version: number
-  children?: DeptRow[]
-}
+type DeptRow = DeptTreeNode
 
 type DeptFormModel = {
   id: string | null
@@ -107,7 +94,7 @@ async function loadTree(): Promise<void> {
   loading.value = true
   try {
     const kw = keyword.value.trim()
-    treeData.value = (await get<DeptRow[]>('/sys/dept/tree', kw ? { keyword: kw } : undefined)) ?? []
+    treeData.value = (await getDeptTree(kw)) ?? []
     expandedKeys.value = flattenTree(treeData.value, (node) => node.children).map((node) => node.id)
   } catch {
     treeData.value = []
@@ -188,10 +175,10 @@ async function submit(): Promise<boolean> {
   }
   try {
     if (editing.value && form.id) {
-      await put(`/sys/dept/${form.id}`, { ...payload, version: form.version })
+      await updateDept(form.id, { ...payload, version: form.version })
       message.success('部门已保存')
     } else {
-      await post('/sys/dept', payload)
+      await createDept(payload)
       message.success('部门已新增')
     }
     await loadTree()

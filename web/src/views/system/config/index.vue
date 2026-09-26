@@ -16,8 +16,7 @@ import {
   type FormInst,
   type FormRules
 } from 'naive-ui'
-import { put } from '@/api/http'
-import { createConfig, deleteConfig, pageConfigs, type ConfigDto } from '@/api/system/config'
+import { createConfig, deleteConfig, pageConfigs, updateConfig, type ConfigDto } from '@/api/system/config'
 import { usePageList } from '@/composables/usePageList'
 import { hasPerm } from '@/directives/permission'
 import { message } from '@/utils/feedback'
@@ -103,7 +102,7 @@ async function submit(): Promise<boolean> {
   }
   try {
     if (editing.value && form.id) {
-      await put(`/sys/config/${form.id}`, { ...payload, version: form.version })
+      await updateConfig(form.id, { ...payload, version: form.version })
       message.success('参数已保存')
     } else {
       await createConfig(payload)

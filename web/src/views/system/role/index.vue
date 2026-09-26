@@ -24,8 +24,15 @@ import {
   type FormRules,
   type TreeOption
 } from 'naive-ui'
-import { post, put } from '@/api/http'
-import { createRole, deleteRole, getRole, pageRoles, type RoleDto } from '@/api/system/role'
+import {
+  createRole,
+  deleteRole,
+  getRole,
+  grantRoleMenus,
+  pageRoles,
+  updateRole,
+  type RoleDto
+} from '@/api/system/role'
 import { getGrantMenuTree, type MenuTreeNode } from '@/api/menu'
 import { getDeptTree } from '@/api/system/dept'
 import { usePageList } from '@/composables/usePageList'
@@ -161,7 +168,7 @@ async function submit(): Promise<boolean> {
   try {
     if (editing.value && form.id) {
       // 后端 PUT /sys/role/{id}（RoleUpdateDto 含 version）
-      await put(`/sys/role/${form.id}`, { ...payload, version: form.version })
+      await updateRole(form.id, { ...payload, version: form.version })
       message.success('角色已保存')
     } else {
       await createRole(payload)
@@ -239,7 +246,7 @@ async function submitGrant(): Promise<void> {
   if (!role) return
   grantSaving.value = true
   try {
-    await post(`/sys/role/${role.id}/menus`, {
+    await grantRoleMenus(role.id, {
       menuIds: toIds(checkedKeys.value),
       dataScope: grantModel.dataScope,
       deptIds: grantModel.dataScope === SCOPE_CUSTOM ? toIds(grantModel.deptIds) : []
