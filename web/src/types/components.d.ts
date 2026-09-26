@@ -18,6 +18,7 @@ declare module 'vue' {
     FlowCanvas: typeof import('./../components/FlowCanvas.vue')['default']
     FlowTimeline: typeof import('./../components/FlowTimeline.vue')['default']
     FlowTrack: typeof import('./../components/FlowTrack.vue')['default']
+    IconLucideArrowLeft: typeof import('~icons/lucide/arrow-left')['default']
     IconLucideBell: typeof import('~icons/lucide/bell')['default']
     IconLucideChevronDown: typeof import('~icons/lucide/chevron-down')['default']
     IconLucideEllipsis: typeof import('~icons/lucide/ellipsis')['default']
