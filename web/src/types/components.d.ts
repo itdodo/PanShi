@@ -35,6 +35,7 @@ declare module 'vue' {
     IconLucideShieldCheck: typeof import('~icons/lucide/shield-check')['default']
     IconLucideSun: typeof import('~icons/lucide/sun')['default']
     IconLucideUserRound: typeof import('~icons/lucide/user-round')['default']
+    IconPicker: typeof import('./../components/IconPicker.vue')['default']
     NDataTable: typeof import('naive-ui')['NDataTable']
     NSelect: typeof import('naive-ui')['NSelect']
     NTag: typeof import('naive-ui')['NTag']

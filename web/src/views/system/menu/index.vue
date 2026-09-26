@@ -37,6 +37,7 @@ import { hasPerm } from '@/directives/permission'
 import { message } from '@/utils/feedback'
 import { flattenTree, menuTypeTag, pruneChildren, statusTag, toId, toTreeOptions } from '../_shared'
 import AppIcon from '@/components/AppIcon.vue'
+import IconPicker from '@/components/IconPicker.vue'
 
 /**
  * 菜单管理（/sys/menu）：树形表格 + 按 menuType 动态显隐的编辑弹窗 + 删除（上移/下移本批次不做）。
@@ -420,10 +421,7 @@ onMounted(() => {
 
         <template v-if="!isButton">
           <NFormItem label="图标" path="icon">
-            <NSpace :size="8" align="center" style="width: 100%">
-              <NInput v-model:value="form.icon" maxlength="128" placeholder="iconify 名，如 lucide:users" style="width: 300px" />
-              <AppIcon :name="form.icon" :size="20" />
-            </NSpace>
+            <IconPicker v-model:value="form.icon" />
           </NFormItem>
           <NFormItem label="路由路径" path="path">
             <NInput v-model:value="form.path" maxlength="256" :placeholder="isDirectory ? '目录可填 /system' : '如 /system/menu'" />

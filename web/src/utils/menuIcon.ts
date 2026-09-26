@@ -70,3 +70,12 @@ export function resolveMenuIcon(raw?: string | null): string {
   if (!name) return FALLBACK_ICON
   return known.has(name) ? name : FALLBACK_ICON
 }
+
+/**
+ * 当前可渲染的图标名全集（`lucide:xxx`，已排序）。
+ * 集合是异步装载的，调用方要放在 computed/响应式上下文里读，才会从空数组变成有内容。
+ */
+export function listIconNames(): string[] {
+  void ready.value
+  return [...known].sort()
+}
