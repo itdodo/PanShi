@@ -11,7 +11,7 @@ using SqlSugar;
 namespace Panshi.Service.Sys;
 
 /// <summary>公告服务（Status：0停用 1发布 2定时发布；latest 仅返回已发布）。</summary>
-public class NoticeService(IRepository<SysNotice> repo) : BaseService<SysNotice>(repo)
+public class NoticeService(IRepository<SysNotice> repo, IRepository<SysUser> userRepo) : BaseService<SysNotice>(repo)
 {
     public async Task<PagedResult<NoticeDto>> PageAsync(NoticeQuery query)
     {
@@ -22,22 +22,31 @@ public class NoticeService(IRepository<SysNotice> repo) : BaseService<SysNotice>
         if (query.Status is not null) exp.And(n => n.Status == query.Status!.Value);
         var (col, desc) = query.ResolveSort(new Dictionary<string, string> { ["createTime"] = "create_time" });
         var page = await Repo.PageAsync(exp.ToExpression(), query.PageNum, query.PageSize, col, desc);
-        return new PagedResult<NoticeDto> { Total = page.Total, Rows = page.Rows.Select(ToDto).ToList() };
+        var names = await CreatorNamesAsync(page.Rows);
+        return new PagedResult<NoticeDto> { Total = page.Total, Rows = page.Rows.Select(n => ToDto(n, names)).ToList() };
     }
 
     /// <summary>顶栏铃铛「公告」Tab：已发布前 N 条。</summary>
     public async Task<List<NoticeDto>> LatestAsync(int take = 10)
-        => (await Repo.ListAsync(n => n.Status == NoticeStatus.Published))
-            .OrderByDescending(n => n.PublishTime ?? n.CreateTime).Take(take).Select(ToDto).ToList();
+    {
+        var list = (await Repo.ListAsync(n => n.Status == NoticeStatus.Published))
+            .OrderByDescending(n => n.PublishTime ?? n.CreateTime).Take(take).ToList();
+        var names = await CreatorNamesAsync(list);
+        return list.Select(n => ToDto(n, names)).ToList();
+    }
 
-    public async Task<NoticeDto> GetAsync(long id) => ToDto(await Repo.GetAsync(id));
+    public async Task<NoticeDto> GetAsync(long id)
+    {
+        var n = await Repo.GetAsync(id);
+        return ToDto(n, await CreatorNamesAsync(new List<SysNotice> { n }));
+    }
 
     public async Task<NoticeDto> CreateAsync(NoticeSaveDto dto)
     {
         Validate(dto);
         var n = Apply(new SysNotice(), dto);
         await Repo.InsertAsync(n);
-        return ToDto(n);
+        return ToDto(n, await CreatorNamesAsync(new List<SysNotice> { n }));
     }
 
     public async Task UpdateAsync(long id, NoticeSaveDto dto)
@@ -65,7 +74,13 @@ public class NoticeService(IRepository<SysNotice> repo) : BaseService<SysNotice>
         n.NoticeType = dto.NoticeType;
         n.Content = Sanitize(dto.Content);
         n.Status = dto.Status;
-        n.PublishTime = dto.Status == NoticeStatus.Published && dto.PublishTime is null ? DateTime.Now : dto.PublishTime;
+        // 发布时间只增不清：撤回停用保留首次发布时间（前端据此区分「草稿/停用」文案）；重新发布不覆盖首发时间
+        n.PublishTime = dto.Status switch
+        {
+            NoticeStatus.Published => dto.PublishTime ?? n.PublishTime ?? DateTime.Now,
+            NoticeStatus.Stopped => n.PublishTime,
+            _ => dto.PublishTime
+        };
         return n;
     }
 
@@ -81,10 +96,19 @@ public class NoticeService(IRepository<SysNotice> repo) : BaseService<SysNotice>
         return cleaned;
     }
 
-    private static NoticeDto ToDto(SysNotice n) => new()
+    private async Task<Dictionary<long, string>> CreatorNamesAsync(IEnumerable<SysNotice> list)
+    {
+        var ids = list.Select(n => n.CreateBy).Where(x => x is not null).Select(x => x!.Value).Distinct().ToList();
+        if (ids.Count == 0) return new Dictionary<long, string>();
+        var users = await userRepo.ListAsync(u => ids.Contains(u.Id));
+        return users.ToDictionary(u => u.Id, u => u.NickName);
+    }
+
+    private static NoticeDto ToDto(SysNotice n, Dictionary<long, string> names) => new()
     {
         Id = n.Id.ToString(), Title = n.Title, NoticeType = n.NoticeType, Content = n.Content,
-        Status = n.Status, PublishTime = n.PublishTime, CreateTime = n.CreateTime, Version = n.Version
+        Status = n.Status, PublishTime = n.PublishTime, CreateTime = n.CreateTime, Version = n.Version,
+        CreateByName = n.CreateBy is long cb ? names.GetValueOrDefault(cb) : null
     };
 }
 

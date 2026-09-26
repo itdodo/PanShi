@@ -217,7 +217,7 @@ const columns = computed<DataTableColumns<NoticeRow>>(() => [
     key: 'status',
     width: 96,
     render: (row) => {
-      const tag = noticeStatusTag(row.status)
+      const tag = noticeStatusTag(row.status, row.publishTime)
       return h(NTag, { size: 'small', bordered: false, type: tag.type }, { default: () => tag.label })
     }
   },
@@ -386,8 +386,8 @@ const columns = computed<DataTableColumns<NoticeRow>>(() => [
         <h3 class="ps-notice-detail__title">{{ detail.title }}</h3>
         <NSpace :size="8" align="center" class="ps-notice-detail__meta">
           <NTag size="small" :bordered="false" type="info">{{ noticeTypeLabel(detail.noticeType) }}</NTag>
-          <NTag size="small" :bordered="false" :type="noticeStatusTag(detail.status).type">
-            {{ noticeStatusTag(detail.status).label }}
+          <NTag size="small" :bordered="false" :type="noticeStatusTag(detail.status, detail.publishTime).type">
+            {{ noticeStatusTag(detail.status, detail.publishTime).label }}
           </NTag>
           <span class="ps-muted">发布人：{{ detail.createByName ?? '-' }}</span>
           <span class="ps-muted">发布时间：{{ formatDateTime(detail.publishTime) }}</span>

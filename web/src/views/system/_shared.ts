@@ -62,7 +62,10 @@ export const NOTICE_TYPE_OPTIONS: NumOption[] = [
   { label: '公告', value: 2 }
 ]
 
-/** NoticeStatus：0 停用 / 1 已发布 / 2 定时发布（到期由 sys.notice.publish 作业置 1） */
+/**
+ * NoticeStatus：0 停用/草稿 / 1 已发布 / 2 定时发布（到期由 sys.notice.publish 作业置 1）。
+ * 0 态按「是否曾有过发布时间」区分文案：无 publishTime = 从未发布的草稿，有 = 发布后又停用。
+ */
 export const NOTICE_STATUS = { Stopped: 0, Published: 1, Scheduled: 2 } as const
 export const NOTICE_STATUS_OPTIONS: NumOption[] = [
   { label: '停用', value: NOTICE_STATUS.Stopped },
@@ -74,10 +77,10 @@ export function noticeTypeLabel(value?: number | null): string {
   return NOTICE_TYPE_OPTIONS.find((item) => item.value === value)?.label ?? '通知'
 }
 
-export function noticeStatusTag(value?: number | null): { label: string; type: TagType } {
+export function noticeStatusTag(value?: number | null, publishTime?: string | null): { label: string; type: TagType } {
   if (value === NOTICE_STATUS.Published) return { label: '已发布', type: 'success' }
   if (value === NOTICE_STATUS.Scheduled) return { label: '定时', type: 'info' }
-  return { label: '停用', type: 'default' }
+  return publishTime ? { label: '停用', type: 'default' } : { label: '草稿', type: 'default' }
 }
 
 /* -------------------------------- 字典标签色 -------------------------------- */
