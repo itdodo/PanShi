@@ -105,6 +105,7 @@ builder.Services.AddScoped<FlowAdminService>();
 builder.Services.AddScoped<FlowQueryService>();
 builder.Services.AddScoped<ExpenseService>();
 builder.Services.AddScoped<PurchaseService>();
+builder.Services.AddScoped<FileAccessService>();
 // 红线 #7：IFlowBusinessHandler 多实现必须 AddScoped（TryAdd 只收第一个）
 builder.Services.AddScoped<IFlowBusinessHandler, ExpenseFlowHandler>();
 builder.Services.AddScoped<IFlowBusinessHandler, PurchaseFlowHandler>();
@@ -136,6 +137,10 @@ builder.Services.AddScoped(typeof(IRepository<>), typeof(SqlSugarRepository<>));
 var hangfireConn = builder.Configuration["Db:ConnectionString"]!;
 builder.Services.AddHangfire(h => h.UsePostgreSqlStorage(c => c.UseNpgsqlConnection(hangfireConn)));
 builder.Services.AddHangfireServer(o => o.WorkerCount = 2);
+
+// 开发期在 Build 时就遍历整张依赖图：控制器/服务构造函数缺注册会当场抛出，
+// 而不是等首个请求打进来才 500（FileAccessService 漏注册就是这么溜过测试的）。
+builder.Host.UseDefaultServiceProvider(o => o.ValidateOnBuild = builder.Environment.IsDevelopment());
 
 var app = builder.Build();
 
