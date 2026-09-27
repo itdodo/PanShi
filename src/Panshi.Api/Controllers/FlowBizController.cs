@@ -108,11 +108,11 @@ public class FlowController(
         => await query.InstancePageAsync(q, Uid);
 
     [HttpGet("instance/{id:long}")]
-    public async Task<FlowInstanceDetailDto> Detail(long id) => await query.DetailAsync(id);
+    public async Task<FlowInstanceDetailDto> Detail(long id) => await query.DetailAsync(id, Uid);
 
     [HttpGet("instance/by-business/{table}/{businessId:long}")]
     public async Task<FlowInstanceDto?> ByBusiness(string table, long businessId)
-        => await query.ByBusinessAsync(table, businessId);
+        => await query.ByBusinessAsync(table, businessId, Uid);
 
     [HttpPost("instance/{id:long}/withdraw")]
     public async Task Withdraw(long id) => await engine.WithdrawAsync(id, Uid);
@@ -148,7 +148,7 @@ public class BizController(ExpenseService expenses, PurchaseService purchases) :
 
     [HttpGet("expense/{id:long}")]
     [HasPermission("biz:expense:list")]
-    public async Task<ExpenseDto> ExpenseGet(long id) => await expenses.GetAsync(id);
+    public async Task<ExpenseDto> ExpenseGet(long id) => await expenses.GetAsync(id, Uid);
 
     [HttpPost("expense")]
     [HasPermission("biz:expense:add")]
@@ -174,7 +174,7 @@ public class BizController(ExpenseService expenses, PurchaseService purchases) :
 
     [HttpGet("purchase/{id:long}")]
     [HasPermission("biz:purchase:list")]
-    public async Task<PurchaseDto> PurchaseGet(long id) => await purchases.GetAsync(id);
+    public async Task<PurchaseDto> PurchaseGet(long id) => await purchases.GetAsync(id, Uid);
 
     [HttpPost("purchase")]
     [HasPermission("biz:purchase:add")]

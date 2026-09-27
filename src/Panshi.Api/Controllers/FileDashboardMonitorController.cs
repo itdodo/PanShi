@@ -7,6 +7,7 @@ using Panshi.Api.Services;
 using Panshi.Common.Exceptions;
 using Panshi.Model.Entities;
 using Panshi.Repository;
+using Panshi.Service.Biz;
 using SqlSugar;
 
 namespace Panshi.Api.Controllers;
@@ -16,8 +17,10 @@ namespace Panshi.Api.Controllers;
 [Authorize]
 [Route("api/v1/file")]
 [Tags("文件")]
-public class FileController(FileStorage storage, IRepository<SysFile> files) : ControllerBase
+public class FileController(FileStorage storage, IRepository<SysFile> files, FileAccessService access) : ControllerBase
 {
+    private long Uid => HttpContext.CurrentUserId();
+
     public sealed record FileDto(string Id, string Name, long Size, string Url);
 
     [HttpPost("upload")]
@@ -32,6 +35,7 @@ public class FileController(FileStorage storage, IRepository<SysFile> files) : C
     [HttpGet("{id:long}")]
     public async Task<FileDto> Meta(long id)
     {
+        await access.EnsureReadableAsync(id, Uid);
         var f = await files.GetAsync(id);
         return new FileDto(f.Id.ToString(), f.FileName, f.Size, $"/api/v1/file/{f.Id}/download");
     }
@@ -39,6 +43,7 @@ public class FileController(FileStorage storage, IRepository<SysFile> files) : C
     [HttpGet("{id:long}/download")]
     public async Task<IActionResult> Download(long id)
     {
+        await access.EnsureReadableAsync(id, Uid);
         var f = await files.GetAsync(id);
         var path = storage.ResolvePath(f);
         if (!global::System.IO.File.Exists(path)) throw BizException.NotFound("文件内容");

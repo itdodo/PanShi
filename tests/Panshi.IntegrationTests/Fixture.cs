@@ -101,6 +101,13 @@ public class PgFixture : IAsyncLifetime
     public LogService Logs()
         => new(Repo<SysOperationLog>(), Repo<SysLoginLog>(), Repo<SysChangeLog>(), DataScope());
 
+    public FlowQueryService FlowQuery()
+        => new(Repo<SysFlowInstance>(), Repo<SysFlowTask>(), Repo<SysFlowRecord>(), Repo<SysFlowCc>(),
+            Repo<SysFlowDefinition>(), Permissions());
+
+    public FileAccessService FileAccess()
+        => new(Repo<SysFile>(), Repo<BizExpense>(), Repo<BizPurchaseRequest>(), DataScope());
+
     public AuthService Auth()
         => new(Repo<SysUser>(), Repo<SysUserRole>(), Repo<SysRole>(), Repo<SysRoleMenu>(), Repo<SysMenu>(),
             Repo<SysDept>(), Repo<SysUserSession>(), Repo<SysLoginLog>(), Token(), Config(), Notify);

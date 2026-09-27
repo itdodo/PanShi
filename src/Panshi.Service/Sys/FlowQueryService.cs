@@ -152,7 +152,8 @@ public class FlowQueryService(
     IRepository<SysFlowTask> taskRepo,
     IRepository<SysFlowRecord> recordRepo,
     IRepository<SysFlowCc> ccRepo,
-    IRepository<SysFlowDefinition> defRepo)
+    IRepository<SysFlowDefinition> defRepo,
+    PermissionService permissions)
 {
     public async Task<PagedResult<FlowTaskDto>> TodoPageAsync(long userId, FlowTaskQuery query)
     {
@@ -202,9 +203,23 @@ public class FlowQueryService(
         };
     }
 
-    public async Task<FlowInstanceDetailDto> DetailAsync(long instanceId)
+    /// <summary>
+    /// 实例详情的可见范围：参与者（发起人 / 该实例的审批人 / 抄送人），
+    /// 外加持有 workflow:instance:list 的管理视角。以前只 [Authorize]，任何登录用户按 id 就能读到全部审批意见。
+    /// </summary>
+    private async Task EnsureInstanceVisibleAsync(SysFlowInstance instance, long userId)
+    {
+        if (instance.SubmitterId == userId) return;
+        if (await permissions.HasPermissionAsync(userId, "workflow:instance:list")) return;
+        if (await taskRepo.ExistsAsync(t => t.InstanceId == instance.Id && t.ApproverUserId == userId)) return;
+        if (await ccRepo.ExistsAsync(c => c.InstanceId == instance.Id && c.UserId == userId)) return;
+        throw BizException.Forbidden("无权查看该审批实例");
+    }
+
+    public async Task<FlowInstanceDetailDto> DetailAsync(long instanceId, long userId)
     {
         var instance = await instanceRepo.GetAsync(instanceId);
+        await EnsureInstanceVisibleAsync(instance, userId);
         var def = await defRepo.FindAsync(d => d.Id == instance.DefinitionId);
         var tasks = (await taskRepo.ListAsync(t => t.InstanceId == instanceId))
             .OrderBy(t => t.CreateTime).ToList();
@@ -226,10 +241,11 @@ public class FlowQueryService(
         };
     }
 
-    public async Task<FlowInstanceDto?> ByBusinessAsync(string businessTable, long businessId)
+    public async Task<FlowInstanceDto?> ByBusinessAsync(string businessTable, long businessId, long userId)
     {
         var i = await instanceRepo.FindAsync(x => x.BusinessTable == businessTable && x.BusinessId == businessId);
         if (i is null) return null;
+        await EnsureInstanceVisibleAsync(i, userId);
         var def = await defRepo.FindAsync(d => d.Id == i.DefinitionId);
         return ToInstanceDto(i, new Dictionary<string, string> { [i.DefinitionId.ToString()] = def?.FlowName ?? "" });
     }

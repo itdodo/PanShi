@@ -30,7 +30,7 @@ public class UserController(UserService users, PermissionService permissions) : 
 
     [HttpGet("{id:long}")]
     [HasPermission("sys:user:list")]
-    public async Task<UserDto> Get(long id) => await users.GetAsync(id);
+    public async Task<UserDto> Get(long id) => await users.GetAsync(id, Uid);
 
     [HttpPost]
     [HasPermission("sys:user:add")]

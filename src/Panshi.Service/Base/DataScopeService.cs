@@ -103,6 +103,19 @@ public class DataScopeService(
         return Expression.Lambda<Func<T, bool>>(body, it);
     }
 
+    /// <summary>
+    /// 单条实体是否落在 ctx 可见范围内——与 Filter&lt;T&gt; 同一套语义的内存版，
+    /// 供「按 id 直读详情」这类无法用查询表达式收敛的入口做归属校验（读必须有，否则列表过滤等于没做）。
+    /// </summary>
+    public static bool IsVisible<T>(ScopeCtx? ctx, T entity) where T : IDataScope
+        => ctx is null || ctx.Best switch
+        {
+            DataScopeType.Dept => entity.DeptId == (ctx.DeptId ?? -1),
+            DataScopeType.DeptAndChild => entity.DeptId is long d1 && ctx.DeptIds.Contains(d1),
+            DataScopeType.Custom => entity.DeptId is long d2 && ctx.DeptIds.Contains(d2),
+            _ => entity.OwnerUserId == ctx.UserId
+        };
+
     private static Expression EqNullable(MemberExpression prop, long value)
         => Expression.Equal(prop, Expression.Constant(value, typeof(long?)));
 

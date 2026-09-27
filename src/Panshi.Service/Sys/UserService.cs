@@ -72,6 +72,17 @@ public class UserService(
         ["status"] = "status", ["lastLoginTime"] = "last_login_time"
     };
 
+    /// <summary>
+    /// 带数据权限的详情：列表已按 ctx 过滤，详情若不做同一判定，「仅本人」档就能按 id 读到别人的手机号/邮箱。
+    /// </summary>
+    public async Task<UserDto> GetAsync(long id, long actorId)
+    {
+        var target = await Repo.FindAsync(id) ?? throw BizException.NotFound("用户");
+        if (!DataScopeService.IsVisible(await dataScope.ResolveAsync(actorId), target))
+            throw BizException.Forbidden("无权查看该用户");
+        return await GetAsync(id);
+    }
+
     public async Task<UserDto> GetAsync(long id)
     {
         var u = await Repo.GetAsync(id);

@@ -38,7 +38,14 @@ public class ExpenseService(
         return new PagedResult<ExpenseDto> { Total = page.Total, Rows = page.Rows.Select(ToDto).ToList() };
     }
 
-    public async Task<ExpenseDto> GetAsync(long id) => ToDto(await Repo.GetAsync(id));
+    /// <summary>详情必须与列表同一套数据权限，否则「仅本人」的人按 id 就能读到别人的单据。</summary>
+    public async Task<ExpenseDto> GetAsync(long id, long userId)
+    {
+        var doc = await Repo.GetAsync(id);
+        if (!DataScopeService.IsVisible(await dataScope.ResolveAsync(userId), doc))
+            throw BizException.Forbidden("无权查看该单据");
+        return ToDto(doc);
+    }
 
     public async Task<ExpenseDto> CreateAsync(ExpenseSaveDto dto, long userId, string userName, long? deptId)
     {
@@ -188,7 +195,14 @@ public class PurchaseService(
         return new PagedResult<PurchaseDto> { Total = page.Total, Rows = page.Rows.Select(ToDto).ToList() };
     }
 
-    public async Task<PurchaseDto> GetAsync(long id) => ToDto(await Repo.GetAsync(id));
+    /// <summary>详情必须与列表同一套数据权限（同报销）。</summary>
+    public async Task<PurchaseDto> GetAsync(long id, long userId)
+    {
+        var doc = await Repo.GetAsync(id);
+        if (!DataScopeService.IsVisible(await dataScope.ResolveAsync(userId), doc))
+            throw BizException.Forbidden("无权查看该单据");
+        return ToDto(doc);
+    }
 
     public async Task<PurchaseDto> CreateAsync(PurchaseSaveDto dto, long userId, string userName, long? deptId)
     {
