@@ -5,8 +5,13 @@ using Panshi.Repository;
 
 namespace Panshi.Service.Base;
 
-/// <summary>数据权限上下文（多角色取最宽档；预解析为常量集合，查询表达式内零方法调用——红线 #1）。</summary>
-public sealed record ScopeCtx(long UserId, long? DeptId, DataScopeType Best, IReadOnlyList<long> DeptIds);
+/// <summary>
+/// 数据权限上下文 = **多角色可见集的并集**，预解析成常量（查询表达式内零方法调用——红线 #1）。
+/// 并集只有两种形态，所以这里不存「档位」，只存展开后的结果：
+/// IncludeSelf（任一角色为「仅本人」）+ DeptIds（各角色「本部门/及以下/自定义」授权部门的并集）。
+/// null = 不过滤（超管，或任一角色为 All）。
+/// </summary>
+public sealed record ScopeCtx(long UserId, bool IncludeSelf, IReadOnlyList<long> DeptIds);
 
 /// <summary>
 /// 数据权限五档（蓝图§5.4）：All 全部 / Dept 本部门 / DeptAndChild 本部门及以下 / Self 仅本人 / Custom 自定义。
@@ -21,7 +26,13 @@ public class DataScopeService(
     IRepository<SysRoleDept> roleDeptRepo,
     IRepository<SysDept> deptRepo)
 {
-    /// <summary>解析当前用户数据权限上下文（超管=null=不过滤）。</summary>
+    /// <summary>
+    /// 解析当前用户的数据权限上下文。多角色是**可见集取并**：任一角色为 All 即不过滤（返回 null）；
+    /// 其余角色各自展开成「看自己」或「一批部门」，最后并起来。
+    /// ⚠️ 别退回「按枚举数值取最宽档」：DataScopeType 的数值序不代表宽度——Dept(2) ⊂ DeptAndChild(3)，
+    /// Custom 更是取决于授权了哪些部门、根本不可比。那样 {本部门}+{本部门及以下} 会被错误收窄成 Dept、
+    /// {自定义}+{仅本人} 会让 Custom 整个失效（本方法在 2026-09-28 之前就是这么写的）。
+    /// </summary>
     public async Task<ScopeCtx?> ResolveAsync(long userId)
     {
         var user = await userRepo.FindAsync(userId);
@@ -32,30 +43,52 @@ public class DataScopeService(
         var roles = (await roleRepo.ListAsync())
             .Where(r => roleIds.Contains(r.Id) && r.Status == EnableStatus.Enabled).ToList();
 
-        if (roles.Count == 0)
-            return new ScopeCtx(userId, user.DeptId, DataScopeType.Self, []);
+        // 无角色 = 只看自己（沿用既有口径：不是看全部，也不是看空）
+        if (roles.Count == 0) return new ScopeCtx(userId, true, []);
+        if (roles.Any(r => r.DataScope == DataScopeType.All)) return null;
 
-        // ⚠️ 已知缺陷（行为保持不变地记在这里，改动需单独评审）：多角色「取最宽档」用的是枚举数值序
-        // All=1 < Dept=2 < DeptAndChild=3 < Self=4 < Custom=5，但真实宽度是 Dept ⊂ DeptAndChild，
-        // 且 Custom 的宽度取决于授权了哪些部门、根本不可比。所以同时持有「本部门」+「本部门及以下」
-        // 两个角色时会被错误收窄成 Dept；Custom 与 Self 并存时 Custom 会被整个忽略。
-        // 正确语义是按角色并集（多个谓词 OR），而非挑一个最宽的。修它会放宽可见范围，属安全面变更。
-        var best = roles.Min(r => (int)r.DataScope);
-        var scope = (DataScopeType)best;
-        if (scope == DataScopeType.All) return null;
-
+        var includeSelf = false;
         var deptIds = new List<long>();
-        if (scope == DataScopeType.DeptAndChild && user.DeptId is long self)
+        var customRoleIds = new List<long>();
+        List<SysDept>? allDepts = null; // 只在真有「本部门及以下」角色时才整表取一次，避免每角色一趟查询
+
+        foreach (var role in roles)
         {
-            deptIds = await DescendantsAsync(self);
-        }
-        else if (scope == DataScopeType.Custom)
-        {
-            var customLinks = await roleDeptRepo.ListAsync(rd => roleIds.Contains(rd.RoleId));
-            deptIds = customLinks.Select(rd => rd.DeptId).Distinct().ToList();
+            switch (role.DataScope)
+            {
+                case DataScopeType.Self:
+                    includeSelf = true;
+                    break;
+                case DataScopeType.Dept:
+                    if (user.DeptId is long own) deptIds.Add(own);
+                    break;
+                case DataScopeType.DeptAndChild:
+                    if (user.DeptId is long root)
+                    {
+                        allDepts ??= await deptRepo.ListAsync();
+                        deptIds.Add(root);
+                        deptIds.AddRange(DescendantIds(allDepts, root));
+                    }
+
+                    break;
+                case DataScopeType.Custom:
+                    customRoleIds.Add(role.Id);
+                    break;
+                case DataScopeType.All:
+                    break; // 上面已提前返回，这里只是让 switch 覆盖全部已知档位
+                default:
+                    throw new NotSupportedException(
+                        $"未处理的数据权限档位 {role.DataScope}（{(int)role.DataScope}）：新增档位必须在本方法登记它的可见集来源");
+            }
         }
 
-        return new ScopeCtx(userId, user.DeptId, scope, deptIds);
+        if (customRoleIds.Count > 0)
+        {
+            var custom = customRoleIds.ToHashSet();
+            deptIds.AddRange((await roleDeptRepo.ListAsync(rd => custom.Contains(rd.RoleId))).Select(rd => rd.DeptId));
+        }
+
+        return new ScopeCtx(userId, includeSelf, deptIds.Distinct().ToList());
     }
 
     /// <summary>
@@ -88,54 +121,25 @@ public class DataScopeService(
         var owner = Expression.Property(it, typeof(T).GetProperty(nameof(IDataScope.OwnerUserId))!);
         var dept = Expression.Property(it, typeof(T).GetProperty(nameof(IDataScope.DeptId))!);
 
-        var plan = PlanOf(ctx.Best);
-        var body = plan switch
-        {
-            // 无部门用户看不到「本部门/及以下/自定义」数据：用 -1 常量保证空集
-            ScopePlan.OwnerOnly => EqNullable(owner, ctx.UserId),
-            ScopePlan.DeptEq => EqNullable(dept, ctx.DeptId ?? -1),
-            ScopePlan.DeptIn => InDeptIds(dept, ctx.DeptIds),
-            _ => throw new InvalidOperationException($"未登记的数据权限形态 {plan}")
-        };
+        // 并集最多一个 OR。两者皆空时用 -1 常量保证恒假（无部门却只拿到「本部门」类角色 → 什么都看不到），
+        // 与内存版 IsVisible 同判：真库里不存在 dept_id = -1 的行，NULL 也匹配不上。
+        var parts = new List<Expression>();
+        if (ctx.IncludeSelf) parts.Add(EqNullable(owner, ctx.UserId));
+        if (ctx.DeptIds.Count > 0) parts.Add(InDeptIds(dept, ctx.DeptIds));
+
+        var body = parts.Count == 0 ? EqNullable(dept, -1) : parts.Aggregate(Expression.OrElse);
         return Expression.Lambda<Func<T, bool>>(body, it);
     }
 
     /// <summary>
-    /// 单条实体是否落在 ctx 可见范围内——与 Filter&lt;T&gt; 共用 PlanOf 这一份语义的内存版，
+    /// 单条实体是否落在 ctx 可见范围内——与 Filter&lt;T&gt; 同一套并集语义的内存版，
     /// 供「按 id 直读详情」这类无法用查询表达式收敛的入口做归属校验（读必须有，否则列表过滤等于没做）。
     /// </summary>
     public static bool IsVisible<T>(ScopeCtx? ctx, T entity) where T : IDataScope
     {
         if (ctx is null) return true;
-        var plan = PlanOf(ctx.Best);
-        return plan switch
-        {
-            ScopePlan.OwnerOnly => entity.OwnerUserId == ctx.UserId,
-            ScopePlan.DeptEq => entity.DeptId == (ctx.DeptId ?? -1),
-            ScopePlan.DeptIn => entity.DeptId is long d && ctx.DeptIds.Contains(d),
-            _ => throw new InvalidOperationException($"未登记的数据权限形态 {plan}")
-        };
-    }
-
-    /// <summary>
-    /// 五档 → 三种行谓词形态。这是全站唯一一份数据权限判定语义（表达式版与内存版都从这里派生），
-    /// 新增档位必须在这里登记，否则运行期直接抛出——安全谓词宁可乐观地炸，也不静默降级成「只看本人」。
-    /// </summary>
-    private static ScopePlan PlanOf(DataScopeType scope) => scope switch
-    {
-        DataScopeType.Self => ScopePlan.OwnerOnly,
-        DataScopeType.Dept => ScopePlan.DeptEq,
-        DataScopeType.DeptAndChild => ScopePlan.DeptIn,
-        DataScopeType.Custom => ScopePlan.DeptIn,
-        DataScopeType.All => throw new InvalidOperationException("All 档不应出现在 ScopeCtx：ResolveAsync 已提前返回 null"),
-        _ => throw new NotSupportedException($"未登记的数据权限档位 {scope}（({(int)scope})）")
-    };
-
-    private enum ScopePlan
-    {
-        OwnerOnly,
-        DeptEq,
-        DeptIn
+        if (ctx.IncludeSelf && entity.OwnerUserId == ctx.UserId) return true;
+        return entity.DeptId is long d && ctx.DeptIds.Contains(d);
     }
 
     private static Expression EqNullable(MemberExpression prop, long value)
@@ -151,12 +155,14 @@ public class DataScopeService(
         return Expression.AndAlso(hasValue, call);
     }
 
-    /// <summary>部门及子孙（ancestors 链内存 BFS）。</summary>
-    private async Task<List<long>> DescendantsAsync(long deptId)
+    /// <summary>
+    /// 子孙部门（不含自身；内存 BFS，Except(result) 顺带兜住脏数据里的父子环）。
+    /// 收非泛型 IReadOnlyList 是为了让 ResolveAsync 只整表取一次部门。
+    /// </summary>
+    private static List<long> DescendantIds(IReadOnlyList<SysDept> all, long root)
     {
-        var all = await deptRepo.ListAsync();
-        var result = new List<long> { deptId };
-        var frontier = new List<long> { deptId };
+        var result = new List<long>();
+        var frontier = new List<long> { root };
         while (frontier.Count > 0)
         {
             var parents = frontier;
