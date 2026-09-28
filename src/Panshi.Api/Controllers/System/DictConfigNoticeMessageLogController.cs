@@ -123,7 +123,7 @@ public class MessageController(MessageService messages) : ControllerBase
     [HttpPost("send")]
     [HasPermission("sys:message:send")]
     public async Task Send([FromBody] MessageSendDto dto) =>
-        await messages.SendAsync(dto, Uid, User.Identity?.Name ?? "");
+        await messages.SendAsync(dto, Uid, HttpContext.CurrentDisplayName());
 
     [HttpGet("my/page")]
     public async Task<PagedResult<MessageDto>> MyPage([FromQuery] MessageQuery query) =>

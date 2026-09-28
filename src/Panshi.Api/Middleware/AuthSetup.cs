@@ -97,6 +97,14 @@ public static class AuthSetup
     public static long CurrentUserId(this HttpContext ctx) =>
         long.TryParse(ctx.User?.FindFirstValue(ClaimTypes.NameIdentifier), out var id) ? id : 0;
 
+    /// <summary>
+    /// 当前用户显示名（真名/昵称），用于落 owner_user_name / submitter_name 这类展示性冗余列。
+    /// ⚠️ 不要用 User.Identity?.Name：本文件把 NameClaimType 指到了 NameIdentifier，
+    /// 那里拿到的是用户 id（曾导致报销单「申请人」列显示成一串雪花号）。
+    /// </summary>
+    public static string CurrentDisplayName(this HttpContext ctx) =>
+        ctx.User?.FindFirstValue("nick") ?? ctx.User?.FindFirstValue(ClaimTypes.Name) ?? "";
+
     public static string? CurrentTokenId(this HttpContext ctx) =>
         ctx.User?.FindFirstValue("jti");
 }

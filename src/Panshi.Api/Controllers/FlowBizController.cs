@@ -22,7 +22,7 @@ public class FlowController(
 {
     private long Uid => HttpContext.CurrentUserId();
 
-    private string Name => User.Identity?.Name ?? "";
+    private string Name => HttpContext.CurrentDisplayName();
 
     private long? Dept => long.TryParse(User.FindFirst("dept")?.Value, out var d) ? d : null;
 
@@ -138,7 +138,7 @@ public class BizController(ExpenseService expenses, PurchaseService purchases) :
 {
     private long Uid => HttpContext.CurrentUserId();
 
-    private string Name => User.Identity?.Name ?? "";
+    private string Name => HttpContext.CurrentDisplayName();
 
     private long? Dept => long.TryParse(User.FindFirst("dept")?.Value, out var d) ? d : null;
 

@@ -94,6 +94,8 @@ public class PgFixture : IAsyncLifetime
     public ExpenseService Expenses()
         => new(Repo<BizExpense>(), Engine(), DataScope());
 
+    public DeptService Depts() => new(Repo<SysDept>(), Repo<SysUser>());
+
     public UserService UserService()
         => new(Repo<SysUser>(), Repo<SysUserRole>(), Repo<SysUserPosition>(), Repo<SysRole>(), Repo<SysDept>(),
             Config(), DataScope());

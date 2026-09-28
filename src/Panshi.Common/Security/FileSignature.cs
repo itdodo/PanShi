@@ -45,13 +45,20 @@ public static class FileSignature
         [".ppt"] = [[0xD0, 0xCF, 0x11, 0xE0]],
     };
 
-    /// <summary>嗅探文件头（head 为文件前 ≤64 字节；webp 特判 RIFF....WEBP）。</summary>
+    /// <summary>嗅探文件头（head 为文件前 ≤64 字节）。</summary>
     public static SniffResult Sniff(string extension, ReadOnlySpan<byte> head)
     {
         if (NoSignatureExtensions.Contains(extension)) return SniffResult.Skipped;
+
+        // RIFF 是容器：前 4 字节只证明「RIFF」，第 8..11 字节的 FOURCC 才证明「WEBP」。
+        // 只查 RIFF 会让 wav/avi 改个扩展名就冒充成功，故两段都核；不足 12 字节的 webp 不可能是合法图，按内容过短拒。
+        if (extension.Equals(".webp", StringComparison.OrdinalIgnoreCase))
+            return head.Length < 12 ? SniffResult.TooShort
+                : head[..4].SequenceEqual("RIFF"u8) && head[8..12].SequenceEqual("WEBP"u8)
+                    ? SniffResult.Matched : SniffResult.Spoofed;
+
         if (!Signatures.TryGetValue(extension, out var candidates)) return SniffResult.Spoofed;
 
-        // RIFF 容器（webp 不在默认白名单，预留）
         if (head.Length < 4) return SniffResult.TooShort;
         foreach (var sig in candidates)
         {

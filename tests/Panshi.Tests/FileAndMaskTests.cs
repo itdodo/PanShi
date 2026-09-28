@@ -40,6 +40,28 @@ public class FileSignatureTests
     [Fact]
     public void Pdf_Real_Signature_Matched()
         => Assert.Equal(FileSignature.SniffResult.Matched, FileSignature.Sniff(".pdf", "%PDF-1.7"u8.ToArray()));
+
+    // ---- webp：RIFF 容器必须核第 8..11 字节的 FOURCC（白名单里有 .webp，嗅探表曾漏配 → 恒被拒） ----
+
+    private static byte[] Riff(string fourcc)
+    {
+        var head = new byte[12];
+        "RIFF"u8.CopyTo(head);
+        for (var i = 0; i < 4; i++) head[8 + i] = (byte)fourcc[i];
+        return head;
+    }
+
+    [Fact]
+    public void Webp_Real_Signature_Matched()
+        => Assert.Equal(FileSignature.SniffResult.Matched, FileSignature.Sniff(".webp", Riff("WEBP")));
+
+    [Fact]
+    public void Webp_Disguised_Wave_Rejected()
+        => Assert.Equal(FileSignature.SniffResult.Spoofed, FileSignature.Sniff(".webp", Riff("WAVE")));
+
+    [Fact]
+    public void Webp_Riff_Truncated_Rejected_As_TooShort()
+        => Assert.Equal(FileSignature.SniffResult.TooShort, FileSignature.Sniff(".webp", "RIFF"u8.ToArray()));
 }
 
 /// <summary>敏感词根脱敏。</summary>

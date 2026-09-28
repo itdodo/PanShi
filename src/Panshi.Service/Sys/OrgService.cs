@@ -18,7 +18,19 @@ public class DeptService(IRepository<SysDept> deptRepo, IRepository<SysUser> use
         if (!string.IsNullOrWhiteSpace(keyword))
         {
             var kw = keyword.Trim();
-            all = all.Where(d => d.DeptName.Contains(kw) || d.DeptCode.Contains(kw)).ToList();
+            var kept = all.Where(d => d.DeptName.Contains(kw) || d.DeptCode.Contains(kw))
+                .Select(d => d.Id).ToHashSet();
+            // 必须把命中节点的整条祖级链补回来：BuildTree 以 ParentId==null 为根递归，
+            // 只留命中行的话，深层节点会因为父级被筛掉而整棵消失（搜「财务」返回空数组）。
+            var byId = all.ToDictionary(d => d.Id);
+            foreach (var id in kept.ToList())
+            {
+                var parent = byId[id].ParentId;
+                while (parent is long pid && byId.ContainsKey(pid) && kept.Add(pid))
+                    parent = byId[pid].ParentId;
+            }
+
+            all = all.Where(d => kept.Contains(d.Id)).ToList();
         }
 
         return BuildTree(all, null);
