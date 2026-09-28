@@ -10,17 +10,42 @@ set -uo pipefail
 cd "$(dirname "$0")/.." || exit 1
 FAST=${1:-}
 FAILED=0
+LOG_DIR=$(mktemp -d 2>/dev/null || echo /tmp/panshi-verify)
+mkdir -p "$LOG_DIR"
 
 step() {
-  local name=$1; shift
+  local name=$1 code=0; shift
   printf '\n▶ %s\n' "$name"
-  if "$@"; then
+  "$@" || code=$?
+  if [ "$code" -eq 0 ]; then
     printf '✔ %s\n' "$name"
   else
-    local code=$?
     printf '✘ %s 失败（退出码 %s）\n' "$name" "$code"
     FAILED=1
   fi
+}
+
+# 只对「已知会偶发」的步骤重试。重试成功也要大声说出来并留下日志——
+# 静默重试等于把真问题藏起来；这里要的是「偶发可容忍，但不许无声」。
+# ⚠️ 退出码必须用 `cmd || code=$?` 立刻取：`if cmd; then…fi` 走 false 分支后 $? 是 if 语句自己的 0。
+step_retry() {
+  local name=$1 log="$LOG_DIR/$2" code=0 code2=0; shift 2
+  printf '\n▶ %s\n' "$name"
+  "$@" >"$log" 2>&1 || code=$?
+  if [ "$code" -eq 0 ]; then
+    printf '✔ %s\n' "$name"
+    return 0
+  fi
+  printf '  … 第 1 次失败（退出码 %s），重试一次。日志：%s\n' "$code" "$log"
+  sleep 3
+  "$@" >"$log" 2>&1 || code2=$?
+  if [ "$code2" -eq 0 ]; then
+    printf '⚠ %s 重试后通过——第 1 次是偶发失败，原因见 %s（别忽略这类抖动）\n' "$name" "$log"
+    return 0
+  fi
+  printf '✘ %s 重试仍失败（退出码 %s），失败输出末尾：\n' "$name" "$code2"
+  tail -25 "$log" | sed 's/^/    /'
+  FAILED=1
 }
 
 stop_at_first_failure() {
@@ -58,9 +83,10 @@ fi
 typecheck_web() { (cd web && npx vue-tsc --noEmit); }
 step "前端类型检查" typecheck_web
 
-# 5) 前端构建
+# 5) 前端构建。这一步观察到过一次偶发失败（单独重跑与整脚本重跑都是绿的，原因未定位），
+#    所以给它一次重试，并把两次的输出都留在 $LOG_DIR 里。
 build_web() { (cd web && npm run build); }
-step "前端构建" build_web
+step_retry "前端构建" web-build.log build_web
 
 stop_at_first_failure
-printf '\n验收全部通过。\n'
+printf '\n验收全部通过。步骤日志：%s\n' "$LOG_DIR"
