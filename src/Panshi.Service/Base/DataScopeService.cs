@@ -33,7 +33,11 @@ public class DataScopeService(
         if (roles.Count == 0)
             return new ScopeCtx(userId, user.DeptId, DataScopeType.Self, []);
 
-        // 多角色并集=取最宽档（All 直接放行）
+        // ⚠️ 已知缺陷（行为保持不变地记在这里，改动需单独评审）：多角色「取最宽档」用的是枚举数值序
+        // All=1 < Dept=2 < DeptAndChild=3 < Self=4 < Custom=5，但真实宽度是 Dept ⊂ DeptAndChild，
+        // 且 Custom 的宽度取决于授权了哪些部门、根本不可比。所以同时持有「本部门」+「本部门及以下」
+        // 两个角色时会被错误收窄成 Dept；Custom 与 Self 并存时 Custom 会被整个忽略。
+        // 正确语义是按角色并集（多个谓词 OR），而非挑一个最宽的。修它会放宽可见范围，属安全面变更。
         var best = roles.Min(r => (int)r.DataScope);
         var scope = (DataScopeType)best;
         if (scope == DataScopeType.All) return null;
@@ -68,15 +72,11 @@ public class DataScopeService(
             .ToList();
     }
 
-    /// <summary>某个用户行是否落在 ctx 的可见范围内（用户列表与日志可见名集合共用这一份判定）。</summary>
-    public static bool UserInScope(ScopeCtx ctx, SysUser u) => ctx.Best switch
-    {
-        DataScopeType.Self => u.OwnerUserId == ctx.UserId,
-        DataScopeType.Dept => u.DeptId == (ctx.DeptId ?? -1),
-        DataScopeType.DeptAndChild => u.DeptId is long d1 && ctx.DeptIds.Contains(d1),
-        DataScopeType.Custom => u.DeptId is long d2 && ctx.DeptIds.Contains(d2),
-        _ => true
-    };
+    /// <summary>
+    /// 某个用户行是否落在 ctx 的可见范围内（用户列表与日志可见名集合共用）。
+    /// SysUser 本身实现 IDataScope（OwnerUserId=自己），所以这里直接复用 IsVisible，不再另写一份判定。
+    /// </summary>
+    public static bool UserInScope(ScopeCtx ctx, SysUser u) => IsVisible(ctx, u);
 
     /// <summary>
     /// 构建过滤表达式（ctx=null 恒真）。只允许常量比较，满足 SqlSugar 翻译。
@@ -92,29 +92,55 @@ public class DataScopeService(
         var owner = Expression.Property(it, typeof(T).GetProperty(nameof(IDataScope.OwnerUserId))!);
         var dept = Expression.Property(it, typeof(T).GetProperty(nameof(IDataScope.DeptId))!);
 
-        var body = ctx.Best switch
+        var plan = PlanOf(ctx.Best);
+        var body = plan switch
         {
             // 无部门用户看不到「本部门/及以下/自定义」数据：用 -1 常量保证空集
-            DataScopeType.Dept => EqNullable(dept, ctx.DeptId ?? -1),
-            DataScopeType.DeptAndChild => InDeptIds(dept, ctx.DeptIds),
-            DataScopeType.Custom => InDeptIds(dept, ctx.DeptIds),
-            _ => EqNullable(owner, ctx.UserId)
+            ScopePlan.OwnerOnly => EqNullable(owner, ctx.UserId),
+            ScopePlan.DeptEq => EqNullable(dept, ctx.DeptId ?? -1),
+            ScopePlan.DeptIn => InDeptIds(dept, ctx.DeptIds),
+            _ => throw new InvalidOperationException($"未登记的数据权限形态 {plan}")
         };
         return Expression.Lambda<Func<T, bool>>(body, it);
     }
 
     /// <summary>
-    /// 单条实体是否落在 ctx 可见范围内——与 Filter&lt;T&gt; 同一套语义的内存版，
+    /// 单条实体是否落在 ctx 可见范围内——与 Filter&lt;T&gt; 共用 PlanOf 这一份语义的内存版，
     /// 供「按 id 直读详情」这类无法用查询表达式收敛的入口做归属校验（读必须有，否则列表过滤等于没做）。
     /// </summary>
     public static bool IsVisible<T>(ScopeCtx? ctx, T entity) where T : IDataScope
-        => ctx is null || ctx.Best switch
+    {
+        if (ctx is null) return true;
+        var plan = PlanOf(ctx.Best);
+        return plan switch
         {
-            DataScopeType.Dept => entity.DeptId == (ctx.DeptId ?? -1),
-            DataScopeType.DeptAndChild => entity.DeptId is long d1 && ctx.DeptIds.Contains(d1),
-            DataScopeType.Custom => entity.DeptId is long d2 && ctx.DeptIds.Contains(d2),
-            _ => entity.OwnerUserId == ctx.UserId
+            ScopePlan.OwnerOnly => entity.OwnerUserId == ctx.UserId,
+            ScopePlan.DeptEq => entity.DeptId == (ctx.DeptId ?? -1),
+            ScopePlan.DeptIn => entity.DeptId is long d && ctx.DeptIds.Contains(d),
+            _ => throw new InvalidOperationException($"未登记的数据权限形态 {plan}")
         };
+    }
+
+    /// <summary>
+    /// 五档 → 三种行谓词形态。这是全站唯一一份数据权限判定语义（表达式版与内存版都从这里派生），
+    /// 新增档位必须在这里登记，否则运行期直接抛出——安全谓词宁可乐观地炸，也不静默降级成「只看本人」。
+    /// </summary>
+    private static ScopePlan PlanOf(DataScopeType scope) => scope switch
+    {
+        DataScopeType.Self => ScopePlan.OwnerOnly,
+        DataScopeType.Dept => ScopePlan.DeptEq,
+        DataScopeType.DeptAndChild => ScopePlan.DeptIn,
+        DataScopeType.Custom => ScopePlan.DeptIn,
+        DataScopeType.All => throw new InvalidOperationException("All 档不应出现在 ScopeCtx：ResolveAsync 已提前返回 null"),
+        _ => throw new NotSupportedException($"未登记的数据权限档位 {scope}（({(int)scope})）")
+    };
+
+    private enum ScopePlan
+    {
+        OwnerOnly,
+        DeptEq,
+        DeptIn
+    }
 
     private static Expression EqNullable(MemberExpression prop, long value)
         => Expression.Equal(prop, Expression.Constant(value, typeof(long?)));
