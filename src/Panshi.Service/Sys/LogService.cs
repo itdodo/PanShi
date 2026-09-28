@@ -143,17 +143,33 @@ public class LogService(
 }
 
 /// <summary>在线会话监控（monitor/online：会话+用户昵称 join）。</summary>
-public class OnlineService(IRepository<SysUserSession> sessionRepo, IRepository<SysUser> userRepo)
+public class OnlineService(
+    IRepository<SysUserSession> sessionRepo,
+    IRepository<SysUser> userRepo,
+    Base.DataScopeService dataScope)
 {
-    public async Task<List<SessionDto>> ListAsync(string? keyword = null)
+    /// <summary>
+    /// 在线会话按调用方的数据权限收敛——与同域的 monitor:loginlog:list 保持一致
+    /// （登录日志那边已经按可见用户集合过滤，在线列表此前是「有菜单就看全员」）。
+    /// ctx=null（超管/All 档）不过滤。
+    /// 另外一律剔除「用户行已不在」的会话：删号/停用后 ValidateSessionAsync 已让令牌失效，
+    /// 但会话行要等到自然过期才消失，留着会让管理端把已注销账号显示成在线。
+    /// </summary>
+    public async Task<List<SessionDto>> ListAsync(long userId, string? keyword = null)
     {
+        var ctx = await dataScope.ResolveAsync(userId);
         var sessions = await sessionRepo.ListAsync(s => s.ExpireTime > DateTime.Now);
-        var users = (await userRepo.ListAsync()).ToDictionary(u => u.Id, u => u.NickName);
+        var users = (await userRepo.ListAsync()).ToDictionary(u => u.Id, u => u);
+        var visible = ctx is null
+            ? null
+            : users.Keys.Where(id => Base.DataScopeService.IsVisible(ctx, users[id])).ToHashSet();
         return sessions.OrderByDescending(s => s.CreateTime)
+            .Where(s => users.ContainsKey(s.UserId))
+            .Where(s => visible is null || visible.Contains(s.UserId))
             .Select(s => new SessionDto
             {
                 Id = s.Id.ToString(), UserId = s.UserId.ToString(),
-                UserName = s.UserName is null ? null : $"{users.GetValueOrDefault(s.UserId, s.UserName)}（{s.UserName}）",
+                UserName = s.UserName is null ? null : $"{users.GetValueOrDefault(s.UserId)?.NickName ?? s.UserName}（{s.UserName}）",
                 LoginIp = s.LoginIp, UserAgent = s.UserAgent, CreateTime = s.CreateTime, ExpireTime = s.ExpireTime
             })
             .Where(x => string.IsNullOrWhiteSpace(keyword) ||

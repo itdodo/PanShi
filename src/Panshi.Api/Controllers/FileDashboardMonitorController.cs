@@ -59,6 +59,11 @@ public class DashboardController(
     IRepository<SysUserSession> sessions,
     IRepository<SysMessage> messages) : ApiControllerBase
 {
+    /// <summary>
+    /// 首页统计卡。这里刻意**不**按数据权限收敛：四个数都是聚合计数（全库用户数 / 在线数 /
+    /// 我的未读 / 我的待办），后两个本就只算当前用户，前两个不暴露任何行级数据。
+    /// 真要给受限角色看「本部门人数」，另开带 scope 的端点，别改这里。
+    /// </summary>
     [HttpGet("stats")]
     public async Task<object> Stats()
     {

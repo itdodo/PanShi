@@ -100,6 +100,8 @@ public class PgFixture : IAsyncLifetime
         => new(Repo<SysUser>(), Repo<SysUserRole>(), Repo<SysUserPosition>(), Repo<SysRole>(), Repo<SysDept>(),
             Config(), DataScope());
 
+    public OnlineService Online() => new(Repo<SysUserSession>(), Repo<SysUser>(), DataScope());
+
     public LogService Logs()
         => new(Repo<SysOperationLog>(), Repo<SysLoginLog>(), Repo<SysChangeLog>(), DataScope());
 

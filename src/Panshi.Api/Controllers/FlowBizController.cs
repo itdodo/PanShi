@@ -96,6 +96,11 @@ public class FlowController(
         return ApiResult.Ok(id == -1 ? "" : id.ToString(), id == -1 ? "未绑定流程，已直通" : "已提交");
     }
 
+    /// <summary>
+    /// 流程实例列表＝「管理视角」，持 workflow:instance:list 即看全部，不按数据权限收窄。
+    /// 这不是漏网：实例详情的 EnsureInstanceVisibleAsync 同样把该权限码列为放行条件，两处口径一致。
+    /// 若将来要按部门收敛，必须列表与详情一起改，否则会出现「列表看不见、详情读得到」。
+    /// </summary>
     [HttpGet("instance/page")]
     [HasPermission("workflow:instance:list")]
     public async Task<PagedResult<FlowInstanceDto>> InstancePage([FromQuery] FlowInstanceQuery q)

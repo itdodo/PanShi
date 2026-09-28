@@ -29,7 +29,7 @@ public class MonitorManageController(JobManagementService jobs, OnlineService on
 
     [HttpGet("online")]
     [HasPermission("monitor:online:list")]
-    public async Task<List<SessionDto>> Online([FromQuery] string? keyword) => await online.ListAsync(keyword);
+    public async Task<List<SessionDto>> Online([FromQuery] string? keyword) => await online.ListAsync(Uid, keyword);
 
     /// <summary>强退任意会话（monitor:online:kick）。</summary>
     [HttpDelete("online/{sessionId:long}")]
