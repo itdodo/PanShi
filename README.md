@@ -19,8 +19,22 @@ dotnet run --project src/Panshi.Api
 cd web && npm install && npm run dev
 
 # 一体化生产形态
-docker compose up -d --build     # http://localhost:8080（API+SPA 单容器）
+docker compose up -d --build     # http://localhost:18080（API+SPA 单容器；主机 18080 → 容器 8080）
 ```
+
+## 验收（提交前必跑）
+
+```bash
+bash scripts/verify.sh          # 后端编译 + 单元 + 集成（需 panshi-db 在跑）+ 前端类型检查 + 前端构建
+bash scripts/verify.sh --fast   # 跳过集成测试那一步
+```
+
+任何一步红就退出码非 0，并指名是哪一步。**别带着红的步骤去 build 镜像。**
+`--fast` 之外还会在 `panshi-db` 没起时直接报错提示，而不是把集成测试静默跑成一片红。
+
+> 为什么单独强调「前端类型检查」：`vite build` 不做类型检查，所以类型错误可以让构建一路绿着过去。
+> 这一轮就撞上过——`@wangeditor/editor-for-vue` 的 `exports` 没暴露类型入口，`vue-tsc` 红了很久，
+> 但没人被拦下来。现在它是验收的第 4 步。
 
 首次启动自动完成：建库建表（CodeFirst）→ 版本化迁移 → 内置种子（管理员/角色/菜单/字典/参数）。
 管理员初始口令见 `src/Panshi.Repository/DbSeeder.cs`，**登录后请立即修改**。生产部署必须用环境变量覆盖 `Jwt__SecretKey` 与数据库密码。
