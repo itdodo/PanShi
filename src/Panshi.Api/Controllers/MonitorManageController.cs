@@ -13,10 +13,8 @@ namespace Panshi.Api.Controllers;
 [Authorize]
 [Route("api/v1/monitor")]
 [Tags("监控-任务与在线")]
-public class MonitorManageController(JobManagementService jobs, OnlineService online, AuthService auth) : ControllerBase
+public class MonitorManageController(JobManagementService jobs, OnlineService online, AuthService auth) : ApiControllerBase
 {
-    private long Uid => HttpContext.CurrentUserId();
-
     [HttpGet("jobs")]
     [HasPermission("monitor:job:list")]
     public List<object> Jobs() => jobs.List();

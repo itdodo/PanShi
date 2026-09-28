@@ -53,8 +53,7 @@ onMounted(() => {
         <NTag v-if="user.isAdmin" type="error" :bordered="false" size="small">内置管理员</NTag>
       </NSpace>
       <p class="ps-hero__desc">
-        左侧菜单由 <code>/api/v1/sys/menu/tree/my</code> 动态生成，页签/权限码/实时通知均已打通；
-        系统管理与审批流页面将在批次 #12 接入。
+        左侧菜单由 <code>/api/v1/sys/menu/tree/my</code> 动态生成，页签、权限码与实时通知均已打通。
       </p>
     </NCard>
 

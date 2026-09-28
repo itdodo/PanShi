@@ -126,7 +126,6 @@ public class FlowAdminService(
         existing.Remark = dto.Remark;
         existing.Version = dto.Version;
         await bindingRepo.UpdateWithAuditAsync(existing, dto.Version);
-        _ = def;
     }
 
     public async Task DeleteBindingAsync(long id) => await bindingRepo.SoftDeleteAsync(id);

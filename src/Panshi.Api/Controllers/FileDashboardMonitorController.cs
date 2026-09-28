@@ -17,10 +17,8 @@ namespace Panshi.Api.Controllers;
 [Authorize]
 [Route("api/v1/file")]
 [Tags("文件")]
-public class FileController(FileStorage storage, IRepository<SysFile> files, FileAccessService access) : ControllerBase
+public class FileController(FileStorage storage, IRepository<SysFile> files, FileAccessService access) : ApiControllerBase
 {
-    private long Uid => HttpContext.CurrentUserId();
-
     public sealed record FileDto(string Id, string Name, long Size, string Url);
 
     [HttpPost("upload")]
@@ -59,10 +57,8 @@ public class FileController(FileStorage storage, IRepository<SysFile> files, Fil
 public class DashboardController(
     ISqlSugarClient db,
     IRepository<SysUserSession> sessions,
-    IRepository<SysMessage> messages) : ControllerBase
+    IRepository<SysMessage> messages) : ApiControllerBase
 {
-    private long Uid => HttpContext.CurrentUserId();
-
     [HttpGet("stats")]
     public async Task<object> Stats()
     {
@@ -89,7 +85,7 @@ public class DashboardController(
 [Authorize]
 [Route("api/v1/monitor")]
 [Tags("监控")]
-public class MonitorController(ISqlSugarClient db) : ControllerBase
+public class MonitorController(ISqlSugarClient db) : ApiControllerBase
 {
     [HttpGet("server")]
     public async Task<object> Server()

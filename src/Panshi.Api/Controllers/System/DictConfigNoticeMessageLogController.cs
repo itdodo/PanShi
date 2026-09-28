@@ -16,7 +16,7 @@ namespace Panshi.Api.Controllers.System;
 [Authorize]
 [Route("api/v1/sys/dict")]
 [Tags("系统-字典")]
-public class DictController(DictService dict) : ControllerBase
+public class DictController(DictService dict) : ApiControllerBase
 {
     [HttpGet("type/page")]
     [HasPermission("sys:dict:list")]
@@ -62,7 +62,7 @@ public class DictController(DictService dict) : ControllerBase
 [Authorize]
 [Route("api/v1/sys/config")]
 [Tags("系统-参数")]
-public class ConfigController(ConfigAdminService configs) : ControllerBase
+public class ConfigController(ConfigAdminService configs) : ApiControllerBase
 {
     [HttpGet("page")]
     [HasPermission("sys:config:list")]
@@ -86,7 +86,7 @@ public class ConfigController(ConfigAdminService configs) : ControllerBase
 [Authorize]
 [Route("api/v1/sys/notice")]
 [Tags("系统-公告")]
-public class NoticeController(NoticeService notices) : ControllerBase
+public class NoticeController(NoticeService notices) : ApiControllerBase
 {
     [HttpGet("page")]
     [HasPermission("sys:notice:list")]
@@ -116,10 +116,8 @@ public class NoticeController(NoticeService notices) : ControllerBase
 [Authorize]
 [Route("api/v1/sys/message")]
 [Tags("系统-站内信")]
-public class MessageController(MessageService messages) : ControllerBase
+public class MessageController(MessageService messages) : ApiControllerBase
 {
-    private long Uid => HttpContext.CurrentUserId();
-
     [HttpPost("send")]
     [HasPermission("sys:message:send")]
     public async Task Send([FromBody] MessageSendDto dto) =>
@@ -152,11 +150,9 @@ public class MessageController(MessageService messages) : ControllerBase
 [Authorize]
 [Route("api/v1/sys/log")]
 [Tags("系统-日志")]
-public class LogController(LogService logs) : ControllerBase
+public class LogController(LogService logs) : ApiControllerBase
 {
     /// <summary>日志三表都没有部门/归属列，数据权限一律按「当前查看者」解析（超管=不过滤）。</summary>
-    private long Uid => HttpContext.CurrentUserId();
-
     [HttpGet("operation")]
     [HasPermission("monitor:operlog:list")]
     public async Task<PagedResult<OperLogDto>> Operation([FromQuery] OperLogQuery query) => await logs.OperPageAsync(query, Uid);

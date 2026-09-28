@@ -6,7 +6,7 @@ import type { MessageDto, NoticeDto } from '@/api/notice'
 
 /**
  * 铃铛/角标数据源：公告 + 站内信 + 待办数。
- * 后端批次 #6/#7 未上线的接口全部静默失败（角标显示 0），不影响布局。
+ * 接口异常时一律静默（角标显示 0），不让角标把页面带崩。
  */
 export const useNoticeStore = defineStore('notice', () => {
   const todoCount = ref(0)

@@ -18,10 +18,8 @@ namespace Panshi.Api.Controllers;
 public class FlowController(
     FlowAdminService admin,
     FlowEngineService engine,
-    FlowQueryService query) : ControllerBase
+    FlowQueryService query) : ApiControllerBase
 {
-    private long Uid => HttpContext.CurrentUserId();
-
     private string Name => HttpContext.CurrentDisplayName();
 
     private long? Dept => long.TryParse(User.FindFirst("dept")?.Value, out var d) ? d : null;
@@ -134,10 +132,8 @@ public class FlowController(
 [Authorize]
 [Route("api/v1/biz")]
 [Tags("业务样板")]
-public class BizController(ExpenseService expenses, PurchaseService purchases) : ControllerBase
+public class BizController(ExpenseService expenses, PurchaseService purchases) : ApiControllerBase
 {
-    private long Uid => HttpContext.CurrentUserId();
-
     private string Name => HttpContext.CurrentDisplayName();
 
     private long? Dept => long.TryParse(User.FindFirst("dept")?.Value, out var d) ? d : null;

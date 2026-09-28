@@ -21,8 +21,6 @@ public abstract class PagedQuery
     /// <summary>asc / desc（缺省 desc）</summary>
     public string? SortOrder { get; set; }
 
-    public int Offset => (Math.Max(PageNum, 1) - 1) * PageSize;
-
     /// <summary>
     /// 解析排序列名：sortField 必须命中白名单，否则回退 CreateTime；
     /// ⚠️ 返回物理列名（下划线），拼接进 OrderBy 前已过白名单 = 防注入。

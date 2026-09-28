@@ -18,7 +18,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Panshi.Service\Panshi.Service.csproj" />
-    <ProjectReference Include="..\Panshi.Middleware\Panshi.Middleware.csproj" />
   </ItemGroup>
 
 </Project>

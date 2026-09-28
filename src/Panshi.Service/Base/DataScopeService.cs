@@ -10,7 +10,9 @@ public sealed record ScopeCtx(long UserId, long? DeptId, DataScopeType Best, IRe
 
 /// <summary>
 /// 数据权限五档（蓝图§5.4）：All 全部 / Dept 本部门 / DeptAndChild 本部门及以下 / Self 仅本人 / Custom 自定义。
-/// 业务侧用法：repo.PageAsync(And(where, DataScope.Filter&lt;T&gt;(ctx)))——实体实现 IDataScope 即接管。
+/// 列表侧用法：Expressionable.Create&lt;T&gt;() 攒完其它条件后 exp.And(DataScopeService.Filter&lt;T&gt;(ctx))
+/// ——必须下推 SQL，别学「取回一页再内存过滤」（会让 total 失真、还会翻出空页，见 UserService 的教训）。
+/// 详情侧用法：IsVisible(ctx, entity) 做归属校验。实体实现 IDataScope 即接管。
 /// </summary>
 public class DataScopeService(
     IRepository<SysUser> userRepo,

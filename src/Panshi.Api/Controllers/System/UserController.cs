@@ -14,10 +14,8 @@ namespace Panshi.Api.Controllers.System;
 [Authorize]
 [Route("api/v1/sys/user")]
 [Tags("系统-用户")]
-public class UserController(UserService users, PermissionService permissions) : ControllerBase
+public class UserController(UserService users, PermissionService permissions) : ApiControllerBase
 {
-    private long Uid => HttpContext.CurrentUserId();
-
     private async Task<Panshi.Service.Sys.UserAuth> Actor() =>
         await permissions.GetAuthAsync(Uid) ?? throw BizException.Unauthorized();
 

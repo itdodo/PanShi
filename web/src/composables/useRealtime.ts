@@ -21,7 +21,7 @@ let connection: HubConnection | null = null
 let connecting = false
 
 export function useRealtime() {
-  /** 连接失败只告警，绝不抛错阻塞页面（后端批次 #9 未上线时同样安全） */
+  /** 连接失败只告警，绝不抛错阻塞页面（无 SignalR 的部署也要能正常用） */
   async function connect(): Promise<void> {
     if (connection || connecting || !tokenStore.access) return
     connecting = true

@@ -92,7 +92,6 @@ public static class AuthSetup
         services.AddAuthorization();
     }
 
-    public static ClaimsPrincipal? CurrentUser(this HttpContext ctx) => ctx.User;
 
     public static long CurrentUserId(this HttpContext ctx) =>
         long.TryParse(ctx.User?.FindFirstValue(ClaimTypes.NameIdentifier), out var id) ? id : 0;

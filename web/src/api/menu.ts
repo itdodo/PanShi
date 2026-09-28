@@ -44,7 +44,7 @@ export function getMyMenuTree(): Promise<MenuTreeNode[]> {
   return get<MenuTreeNode[]>('/sys/menu/tree/my')
 }
 
-/* ---- 以下为菜单管理契约预声明（批次 #12 页面使用；后端未上线时 404 静默由调用方决定） ---- */
+/* ---- 菜单管理契约（后端已上线；404 静默与否仍由调用方决定） ---- */
 
 export interface MenuFormDto {
   id?: string

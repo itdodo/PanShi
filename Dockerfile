@@ -14,7 +14,6 @@ COPY src/Panshi.Model src/Panshi.Model
 COPY src/Panshi.Common src/Panshi.Common
 COPY src/Panshi.Repository src/Panshi.Repository
 COPY src/Panshi.Service src/Panshi.Service
-COPY src/Panshi.Middleware src/Panshi.Middleware
 COPY src/Panshi.Api src/Panshi.Api
 RUN dotnet publish src/Panshi.Api -c Release -o /publish /p:NoWarn=NETSDK1138
 

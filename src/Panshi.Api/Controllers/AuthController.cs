@@ -24,10 +24,8 @@ public class AuthController(
     ICaptcha captcha,
     FileStorage storage,
     IRepository<SysFile> fileRepo,
-    ConfigService config) : ControllerBase
+    ConfigService config) : ApiControllerBase
 {
-    private long Uid => HttpContext.CurrentUserId();
-
     private string Jti => HttpContext.CurrentTokenId() ?? throw BizException.Unauthorized();
 
     private string Ip => HttpContext.Connection.RemoteIpAddress?.ToString() ?? "";

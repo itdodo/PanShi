@@ -14,10 +14,8 @@ namespace Panshi.Api.Controllers.System;
 [Authorize]
 [Route("api/v1/sys/role")]
 [Tags("系统-角色")]
-public class RoleController(RoleService roles, PermissionService permissions) : ControllerBase
+public class RoleController(RoleService roles, PermissionService permissions) : ApiControllerBase
 {
-    private long Uid => HttpContext.CurrentUserId();
-
     private async Task<UserAuth> Actor() => await permissions.GetAuthAsync(Uid) ?? throw BizException.Unauthorized();
 
     [HttpGet("page")]
@@ -58,10 +56,8 @@ public class RoleController(RoleService roles, PermissionService permissions) : 
 [Authorize]
 [Route("api/v1/sys/menu")]
 [Tags("系统-菜单")]
-public class MenuController(MenuService menus) : ControllerBase
+public class MenuController(MenuService menus) : ApiControllerBase
 {
-    private long Uid => HttpContext.CurrentUserId();
-
     [HttpGet("tree")]
     [HasPermission("sys:menu:list")]
     public async Task<List<MenuDto>> Tree() => await menus.FullTreeAsync();
@@ -99,7 +95,7 @@ public class MenuController(MenuService menus) : ControllerBase
 [Authorize]
 [Route("api/v1/sys/dept")]
 [Tags("系统-部门")]
-public class DeptController(DeptService depts) : ControllerBase
+public class DeptController(DeptService depts) : ApiControllerBase
 {
     [HttpGet("tree")]
     public async Task<List<DeptDto>> Tree([FromQuery] string? keyword) => await depts.TreeAsync(keyword);
@@ -125,7 +121,7 @@ public class DeptController(DeptService depts) : ControllerBase
 [Authorize]
 [Route("api/v1/sys/position")]
 [Tags("系统-岗位")]
-public class PositionController(PositionService positions) : ControllerBase
+public class PositionController(PositionService positions) : ApiControllerBase
 {
     [HttpGet("page")]
     [HasPermission("sys:position:list")]

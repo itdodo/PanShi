@@ -99,7 +99,6 @@ builder.Services.AddSingleton<LogCleanupJob>();
 builder.Services.AddSingleton<NoticePublishJob>();
 builder.Services.AddSingleton<BackupService>();
 builder.Services.AddSingleton<JobManagementService>();
-builder.Services.AddHttpClient();
 builder.Services.AddScoped<FlowEngineService>();
 builder.Services.AddScoped<FlowAdminService>();
 builder.Services.AddScoped<FlowQueryService>();

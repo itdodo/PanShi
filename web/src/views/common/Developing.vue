@@ -3,7 +3,7 @@ import { NButton, NResult, NSpace } from 'naive-ui'
 import { useRoute } from 'vue-router'
 
 /**
- * 菜单 component 指向的文件尚未实现时的占位页（批次 #12 会逐页替换）。
+ * 菜单 component 指向的文件不存在时的兜底页（路由按名字解析不到组件时落到这里）。
  * 保证「后端菜单先于前端页面」也不会白屏报错。
  */
 const route = useRoute()

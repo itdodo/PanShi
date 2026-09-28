@@ -139,7 +139,7 @@ public class FlowEngineService(
                     {
                         nextSeq.Status = FlowTaskStatus.Pending;
                         await taskRepo.UpdateColumnsAsync(nextSeq, "Status");
-                        await NotifyUsersSafeAsync([nextSeq.ApproverUserId], $"待办：{instance.Summary ?? task.NodeName}",
+                        await NotifyUsersIfAnyAsync([nextSeq.ApproverUserId], $"待办：{instance.Summary ?? task.NodeName}",
                             nextSeq.NodeName, instance);
                         return;
                     }
@@ -196,7 +196,7 @@ public class FlowEngineService(
                 await taskRepo.InsertAsync(resubmit);
                 instance.CurrentNodeCode = FlowConstants.NodeType.Start;
                 await instanceRepo.UpdateColumnsAsync(instance, "CurrentNodeCode");
-                await NotifyUsersSafeAsync([instance.SubmitterId], $"待重新提交：{instance.Summary}", "重新提交", instance);
+                await NotifyUsersIfAnyAsync([instance.SubmitterId], $"待重新提交：{instance.Summary}", "重新提交", instance);
                 return;
             }
 
@@ -228,7 +228,7 @@ public class FlowEngineService(
             });
             await AddRecordAsync(instance.Id, task.NodeCode, task.NodeName, FlowConstants.Action.Transfer,
                 actorId, actorName, dto.Comment, JsonSerializer.Serialize(new { to = target.Id.ToString() }, Json));
-            await NotifyUsersSafeAsync([target.Id], $"待办（转办给你）：{instance.Summary}", task.NodeName, instance);
+            await NotifyUsersIfAnyAsync([target.Id], $"待办（转办给你）：{instance.Summary}", task.NodeName, instance);
         });
     }
 
@@ -268,7 +268,7 @@ public class FlowEngineService(
                 actorId, actorName, dto.Comment,
                 JsonSerializer.Serialize(new { after = dto.After, users = users.Select(u => u.Id.ToString()) }, Json));
             if (!dto.After)
-                await NotifyUsersSafeAsync(users.Select(u => u.Id).ToList(), $"待办（加签）：{instance.Summary}",
+                await NotifyUsersIfAnyAsync(users.Select(u => u.Id).ToList(), $"待办（加签）：{instance.Summary}",
                     task.NodeName, instance);
         });
     }
@@ -301,7 +301,7 @@ public class FlowEngineService(
             if (instance.Status != FlowInstanceStatus.Running) throw new BizException("实例已结束");
             await FinishCoreAsync(instance, FlowInstanceStatus.Voided, null, actorId,
                 instance.SubmitterName, FlowConstants.Action.Void, reason);
-            await NotifyUsersSafeAsync([instance.SubmitterId], $"单据已作废：{instance.Summary}", "作废", instance);
+            await NotifyUsersIfAnyAsync([instance.SubmitterId], $"单据已作废：{instance.Summary}", "作废", instance);
         });
     }
 
@@ -443,7 +443,7 @@ public class FlowEngineService(
         }
 
         await taskRepo.InsertRangeAsync(created);
-        await NotifyUsersSafeAsync(created.Where(t => t.Status == FlowTaskStatus.Pending).Select(t => t.ApproverUserId).ToList(),
+        await NotifyUsersIfAnyAsync(created.Where(t => t.Status == FlowTaskStatus.Pending).Select(t => t.ApproverUserId).ToList(),
             $"待办：{instance.Summary}", node.Name, instance);
     }
 
@@ -455,7 +455,7 @@ public class FlowEngineService(
             NodeMode = FlowConstants.NodeMode.OrSign, ApproverUserId = append.UserId,
             ApproverName = append.UserName, Status = FlowTaskStatus.Pending
         });
-        await NotifyUsersSafeAsync([append.UserId], $"待办（加签）：{instance.Summary}", append.Name, instance);
+        await NotifyUsersIfAnyAsync([append.UserId], $"待办（加签）：{instance.Summary}", append.Name, instance);
     }
 
     /// <summary>审批人解析：user/role/position(company|submitterDept)/deptLeader/submitterChoice，多规则并集。</summary>
@@ -555,7 +555,7 @@ public class FlowEngineService(
         }
 
         await AddRecordAsync(instance.Id, node.Code, node.Name ?? "抄送", FlowConstants.Action.Cc, null, "系统", null);
-        await NotifyUsersSafeAsync(userIds.ToList(), $"抄送：{instance.Summary}", node.Name ?? "抄送", instance);
+        await NotifyUsersIfAnyAsync(userIds.ToList(), $"抄送：{instance.Summary}", node.Name ?? "抄送", instance);
     }
 
     private async Task FinishAsync(SysFlowInstance instance, FlowInstanceStatus status, FlowGraph? graph,
@@ -570,7 +570,7 @@ public class FlowEngineService(
             FlowInstanceStatus.Rejected => "审批被拒绝",
             _ => "审批已结束"
         };
-        await NotifyUsersSafeAsync([instance.SubmitterId], $"{title}：{instance.Summary}", title, instance);
+        await NotifyUsersIfAnyAsync([instance.SubmitterId], $"{title}：{instance.Summary}", title, instance);
     }
 
     private async Task FinishCoreAsync(SysFlowInstance instance, FlowInstanceStatus status, FlowGraph? graph,
@@ -618,7 +618,7 @@ public class FlowEngineService(
         });
     }
 
-    private async Task NotifyUsersSafeAsync(List<long> userIds, string title, string? content,
+    private async Task NotifyUsersIfAnyAsync(List<long> userIds, string title, string? content,
         SysFlowInstance instance)
     {
         if (userIds.Count == 0) return;
