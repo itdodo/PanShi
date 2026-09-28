@@ -66,17 +66,11 @@ public class DataScopeService(
         var ctx = await ResolveAsync(userId);
         if (ctx is null) return null;
         return (await userRepo.ListAsync())
-            .Where(u => UserInScope(ctx, u))
+            .Where(u => IsVisible(ctx, u))
             .Select(u => u.UserName)
             .Distinct()
             .ToList();
     }
-
-    /// <summary>
-    /// 某个用户行是否落在 ctx 的可见范围内（用户列表与日志可见名集合共用）。
-    /// SysUser 本身实现 IDataScope（OwnerUserId=自己），所以这里直接复用 IsVisible，不再另写一份判定。
-    /// </summary>
-    public static bool UserInScope(ScopeCtx ctx, SysUser u) => IsVisible(ctx, u);
 
     /// <summary>
     /// 构建过滤表达式（ctx=null 恒真）。只允许常量比较，满足 SqlSugar 翻译。

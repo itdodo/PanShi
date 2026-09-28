@@ -45,15 +45,15 @@ public class UserService(
             exp.And(u => u.DeptId != null && deptIdList.Contains(u.DeptId.Value));
         }
         else if (query.DeptId is long qd) exp.And(u => u.DeptId == qd);
+        // 数据权限必须下推成 SQL 条件（与 LogService 同一做法）。之前是取回一页再内存过滤：
+        // total 保持库侧值 → 受限账号看到「共 N 条」却一行都没有，且整页都可能被过滤掉而翻出空页。
+        if (ctx is not null) exp.And(DataScopeService.Filter<SysUser>(ctx));
 
         var (col, desc) = query.ResolveSort(UserSortWhitelist);
         var page = await Repo.PageAsync(exp.ToExpression(), query.PageNum, query.PageSize, col, desc);
 
-        // ctx 非空时按最宽档后置过滤（分页总数保持库侧值）
-        var rows = ctx is null ? page.Rows : page.Rows.Where(u => DataScopeService.UserInScope(ctx, u)).ToList();
-
         var deptNames = (await deptRepo.ListAsync()).ToDictionary(x => x.Id, x => x.DeptName);
-        var ids = rows.Select(u => u.Id).ToHashSet();
+        var ids = page.Rows.Select(u => u.Id).ToHashSet();
         var roleLinks = (await userRoleRepo.ListAsync()).Where(l => ids.Contains(l.UserId))
             .GroupBy(l => l.UserId).ToDictionary(g => g.Key, g => g.Select(x => x.RoleId).ToList());
         var posLinks = (await userPosRepo.ListAsync()).Where(l => ids.Contains(l.UserId))
@@ -62,7 +62,7 @@ public class UserService(
         return new PagedResult<UserDto>
         {
             Total = page.Total,
-            Rows = rows.Select(u => ToDto(u, deptNames, roleLinks, posLinks)).ToList()
+            Rows = page.Rows.Select(u => ToDto(u, deptNames, roleLinks, posLinks)).ToList()
         };
     }
 

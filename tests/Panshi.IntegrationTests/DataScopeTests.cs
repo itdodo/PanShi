@@ -1,3 +1,4 @@
+using Panshi.Model.Dtos;
 using Panshi.Model.Entities;
 using Panshi.Model.Enums;
 using Panshi.Repository;
@@ -110,4 +111,61 @@ public class DataScopeTests(PgFixture fx) : PgTestBase(fx)
     public void Filter_With_All_Scope_Throws_Instead_Of_Silently_Filtering()
         => Assert.Throws<InvalidOperationException>(
             () => DataScopeService.Filter<BizExpense>(new ScopeCtx(1, 1, DataScopeType.All, [])));
+
+    /// <summary>
+    /// 用户列表的数据权限必须下推 SQL。修复前是「取回一页再内存过滤」：
+    /// total 保持库侧值（真机实测 rows=[] 而 total=4），且受限账号会翻出整页空白。
+    /// </summary>
+    [Fact]
+    public async Task User_Page_Pushes_Scope_Into_Sql_Keeping_Total_And_Pages_Truthful()
+    {
+        var tag = SnowflakeId.NextId();
+        var deptA = 942_000_000L + tag % 100_000L;
+        var deptB = deptA + 1;
+
+        var role = new SysRole
+        {
+            Id = SnowflakeId.NextId(), RoleCode = $"r_{tag}", RoleName = "用户分页夹具角色",
+            DataScope = DataScopeType.Dept, Status = EnableStatus.Enabled, Sort = 999
+        };
+        SysUser User(string kind, int seq, long dept)
+        {
+            var u = new SysUser
+            {
+                Id = SnowflakeId.NextId(), UserName = $"{kind}{seq}_{tag}", NickName = "分页探针",
+                Password = "not-used", DeptId = dept, Status = EnableStatus.Enabled, PwdUpdateTime = DateTime.Now
+            };
+            u.OwnerUserId = u.Id;
+            return u;
+        }
+
+        var mine = new[] { User("a", 1, deptA), User("a", 2, deptA), User("a", 3, deptA) };
+        var others = new[] { User("b", 1, deptB), User("b", 2, deptB) };
+        var all = mine.Concat(others).ToList();
+        await Db.Insertable(role).ExecuteCommandAsync();
+        await Db.Insertable(all).ExecuteCommandAsync();
+        await Db.Insertable(new SysUserRole
+        {
+            Id = SnowflakeId.NextId(), UserId = mine[0].Id, RoleId = role.Id
+        }).ExecuteCommandAsync();
+
+        try
+        {
+            var users = Fx.UserService();
+            var p1 = await users.PageAsync(new UserQuery { PageNum = 1, PageSize = 2 }, mine[0].Id);
+            var p2 = await users.PageAsync(new UserQuery { PageNum = 2, PageSize = 2 }, mine[0].Id);
+
+            Assert.Equal(3, p1.Total); // total 只数本部门 3 人，不再把 deptB 算进来
+            Assert.Equal(2, p1.Rows.Count); // 第一页必须是满页——后置过滤时这里可能是 0
+            var seen = p1.Rows.Concat(p2.Rows).Select(r => r.UserName).ToList();
+            Assert.Equal(3, seen.Distinct().Count());
+            Assert.All(seen, n => Assert.StartsWith("a", n));
+        }
+        finally
+        {
+            await Db.Deleteable<SysUser>().In(all.Select(u => u.Id).ToList()).ExecuteCommandAsync();
+            await Db.Deleteable<SysUserRole>().Where(l => l.UserId == mine[0].Id).ExecuteCommandAsync();
+            await Db.Deleteable<SysRole>().Where(r => r.Id == role.Id).ExecuteCommandAsync();
+        }
+    }
 }
