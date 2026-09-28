@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.StaticFiles;
 using System.Security.Claims;
+using System.Text.Json;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Mvc;
 using Panshi.Common.Results;
@@ -11,6 +12,7 @@ using Panshi.Api.Filters;
 using Panshi.Api.Jobs;
 using Panshi.Api.Hubs;
 using Panshi.Api.Middleware;
+using Panshi.Api.Security;
 using Panshi.Api.Services;
 using Panshi.Common.Cache;
 using Panshi.Common.Json;
@@ -52,18 +54,37 @@ builder.Services.AddMemoryCache();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddSignalR();
 
-// 登录/验证码接口限流（防爆破辅助，账号锁定为主）
+// 登录/验证码接口限流（防爆破辅助，账号锁定为主）。分区键 = 解析后的真实来源 IP。
+// ⚠️ 直连/容器 NAT 拓扑下所有客户端会共用同一个对端地址，此时 PermitLimit 实际是「整站每分钟」的量——
+// 反代后面务必同时开 Features:TrustForwardedHeaders 并登记 Security:TrustedProxies，否则第 11 次登录就挡住所有人。
 builder.Services.AddRateLimiter(rl =>
 {
     rl.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
     var loginPermit = builder.Configuration.GetValue("RateLimit:LoginPermit", 10);
     var captchaPermit = builder.Configuration.GetValue("RateLimit:CaptchaPermit", 60);
     rl.AddPolicy("login", http => RateLimitPartition.GetFixedWindowLimiter(
-        http.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        ClientIp.PartitionKey(http),
         _ => new FixedWindowRateLimiterOptions { PermitLimit = loginPermit, Window = TimeSpan.FromMinutes(1) }));
     rl.AddPolicy("captcha", http => RateLimitPartition.GetFixedWindowLimiter(
-        http.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        ClientIp.PartitionKey(http),
         _ => new FixedWindowRateLimiterOptions { PermitLimit = captchaPermit, Window = TimeSpan.FromMinutes(1) }));
+
+    // 被拒必须留痕：没有这条日志，阈值是松是紧只能靠猜；留痕也才谈得上将来按 IP 做黑名单
+    rl.OnRejected = async (ctx, ct) =>
+    {
+        var http = ctx.HttpContext;
+        http.RequestServices.GetRequiredService<ILoggerFactory>().CreateLogger("Security.RateLimit")
+            .LogWarning("429 限流拒绝 policy={Policy} ip={Ip} path={Path} ua={Ua}",
+                http.GetEndpoint()?.Metadata
+                    .GetMetadata<Microsoft.AspNetCore.RateLimiting.EnableRateLimitingAttribute>()?.PolicyName ?? "-",
+                ClientIp.Of(http), http.Request.Path.Value, http.Request.Headers.UserAgent.ToString());
+
+        // 与 OnChallenge/OnForbidden 同一套路：直写信封，别让 429 变成前端读不懂的空体
+        http.Response.StatusCode = StatusCodes.Status429TooManyRequests;
+        http.Response.ContentType = "application/json; charset=utf-8";
+        await http.Response.WriteAsync(
+            JsonSerializer.Serialize(ApiResult.Fail(429, "操作过于频繁，请稍后再试"), JsonConfig.Options), ct);
+    };
 });
 
 builder.Services.AddCors(cors => cors.AddPolicy("web", p => p
@@ -114,14 +135,29 @@ builder.Services.AddScoped<INotifyService, NotifyService>();
 
 // 反向代理（nginx/Traefik 等）后：读取 X-Forwarded-For / X-Forwarded-Proto，
 // 让日志、限流、SignalR 拿到真实客户端 IP 与 https 协议。默认关闭（直连本地测试不受影响），
-// 部署到反代后面时设 Features:TrustForwardedHeaders=true 开启。
-if (builder.Configuration.GetValue("Features:TrustForwardedHeaders", false))
+// 部署到反代后面时设 Features:TrustForwardedHeaders=true，并把直连本服务的那一跳填进 Security:TrustedProxies。
+// ⚠️ 旧写法是 KnownIPNetworks.Clear() + KnownProxies.Clear()，那是「相信任何来源自带的 XFF」——
+// 来源 IP 就成了客户端说了算的东西：按 IP 限流可绕、将来按 IP 拉黑可被投毒。现在换成显式受信名单，
+// 且开关与名单缺一即启动失败（配置期炸一次，胜过运行期默默信了不该信的人）。
+var trustForwarded = builder.Configuration.GetValue("Features:TrustForwardedHeaders", false);
+var trustedProxies = ClientIp.ReadTrustedProxies(builder.Configuration);
+if (trustForwarded)
 {
+    if (trustedProxies.Count == 0)
+        throw new InvalidOperationException(
+            "Features:TrustForwardedHeaders=true 但 Security:TrustedProxies 为空。" +
+            "这样任何客户端自带的 X-Forwarded-For 都会被采信，来源 IP 可被随意伪造。" +
+            "请把直连本服务的反代地址填进 Security:TrustedProxies（IP 或 CIDR，逗号分隔），或把该开关设回 false。");
+
     builder.Services.Configure<ForwardedHeadersOptions>(o =>
     {
         o.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+        // 开了这个开关，名单就是唯一的真相：连默认的「信任回环」也清掉。
+        // 否则本机 curl/本机任意进程都能替你声明来源 IP，「受信名单」沦为建议性的、且不可验证。
+        // 本机反代请显式写进 Security:TrustedProxies（如 127.0.0.1）。
         o.KnownIPNetworks.Clear();
         o.KnownProxies.Clear();
+        foreach (var net in trustedProxies) o.KnownIPNetworks.Add(net);
     });
 }
 
@@ -144,8 +180,11 @@ builder.Host.UseDefaultServiceProvider(o => o.ValidateOnBuild = builder.Environm
 var app = builder.Build();
 
 // 反代后最先应用，确保后续限流/日志/鉴权读到真实来源
-if (app.Configuration.GetValue("Features:TrustForwardedHeaders", false))
+if (trustForwarded)
     app.UseForwardedHeaders();
+app.Logger.LogInformation("来源 IP 解析：{Mode}", trustForwarded
+    ? $"采信 XFF，受信代理 {trustedProxies.Count} 条（名单外来源自带的 XFF 一律忽略）"
+    : "不采信 XFF（直连形态；若实际在反代/容器 NAT 后面，所有客户端会共用一个来源 IP）");
 
 // Hangfire 作业激活器：每次执行创建 DI 作用域
 JobActivator.Current = new Panshi.Api.Jobs.ScopedJobActivator(

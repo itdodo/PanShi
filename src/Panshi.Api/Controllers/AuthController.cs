@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Panshi.Api.Middleware;
+using Panshi.Api.Security;
 using Panshi.Api.Services;
 using Panshi.Common.Exceptions;
 using Panshi.Common.Results;
@@ -28,7 +29,7 @@ public class AuthController(
 {
     private string Jti => HttpContext.CurrentTokenId() ?? throw BizException.Unauthorized();
 
-    private string Ip => HttpContext.Connection.RemoteIpAddress?.ToString() ?? "";
+    private string Ip => ClientIp.Of(HttpContext);
 
     private string Ua => Request.Headers.UserAgent.ToString();
 

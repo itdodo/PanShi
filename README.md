@@ -37,6 +37,26 @@ bash scripts/verify.sh --fast   # 跳过集成测试那一步
 > 这一轮就撞上过——`@wangeditor/editor-for-vue` 的 `exports` 没暴露类型入口，`vue-tsc` 红了很久，
 > 但没人被拦下来。现在它是验收的第 4 步。
 
+## 来源 IP 与限流（安全 P0）
+
+所有「按调用方」的判断（限流分区、登录日志 IP、操作日志 IP）都走同一个入口 `ClientIp.Of` / `ClientIp.PartitionKey`，
+而它信不信 `X-Forwarded-For` 由两个配置决定：
+
+| 配置 | 默认 | 说明 |
+|---|---|---|
+| `Features:TrustForwardedHeaders` | `false` | 直连形态保持 false；反代/负载均衡后面才设 true |
+| `Security:TrustedProxies` | `[]` | **设了 true 就必须填**，否则启动直接失败 |
+
+⚠️ 两条硬规则：
+1. `TrustForwardedHeaders=true` 时**只认这份名单**——连框架默认的「信任回环」也清掉。本机反代请显式写 `127.0.0.1`。
+   否则任何本机进程都能替你声明来源 IP，「受信名单」就成了建议性的、也不可验证。
+2. 名单为空 + 开关为真 = **启动失败**（配置期炸一次，胜过运行期默默信了不该信的人）。
+
+另外注意容器/ NAT 拓扑的静默陷阱：`docker compose` 直连发布端口时，容器看到的对端往往是网关地址，
+于是 `login 10/min` 实际是「整站每分钟 10 次」——第 11 次登录会把所有人挡在门外。
+启动日志会打印当前是哪种形态（`来源 IP 解析：…`），被限流时也会留一条
+`429 限流拒绝 policy=… ip=… path=…` 的 Warning，别等到用户报「登录不上」才发现。
+
 首次启动自动完成：建库建表（CodeFirst）→ 版本化迁移 → 内置种子（管理员/角色/菜单/字典/参数）。
 管理员初始口令见 `src/Panshi.Repository/DbSeeder.cs`，**登录后请立即修改**。生产部署必须用环境变量覆盖 `Jwt__SecretKey` 与数据库密码。
 

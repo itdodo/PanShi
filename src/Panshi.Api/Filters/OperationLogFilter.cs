@@ -6,6 +6,7 @@ using Panshi.Common.Runtime;
 using Panshi.Common.Security;
 using Panshi.Model.Entities;
 using SqlSugar;
+using Panshi.Api.Security;
 
 namespace Panshi.Api.Filters;
 
@@ -47,7 +48,7 @@ public class OperationLogFilter(ISqlSugarClient db) : IAsyncActionFilter
                 Params = CaptureParams(context, request),
                 UserId = OperationUser.UserId,
                 UserName = OperationUser.UserName,
-                Ip = context.HttpContext.Connection.RemoteIpAddress?.ToString(),
+                Ip = ClientIp.Of(context.HttpContext),
                 UserAgent = request.Headers.UserAgent.ToString(),
                 ElapsedMs = sw.ElapsedMilliseconds,
                 Success = executed.Exception is null,
