@@ -145,3 +145,23 @@ public enum BizDocStatus
     /// <summary>撤回</summary>
     Withdrawn = 4
 }
+
+/// <summary>IP 名单类型。白名单优先于黑名单（先命中先放行），且白名单同时豁免限流。</summary>
+public enum IpRuleKind
+{
+    /// <summary>黑名单：命中即拒</summary>
+    Black = 1,
+
+    /// <summary>白名单：命中即放行，并豁免限流</summary>
+    White = 2
+}
+
+/// <summary>IP 名单来源。自动项必须带过期时间，且永不自动产生永久规则。</summary>
+public enum IpRuleSource
+{
+    /// <summary>人工配置</summary>
+    Manual = 1,
+
+    /// <summary>系统自动（如凭据滥用作动）</summary>
+    Auto = 2
+}

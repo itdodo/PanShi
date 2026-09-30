@@ -62,12 +62,14 @@ builder.Services.AddRateLimiter(rl =>
     rl.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
     var loginPermit = builder.Configuration.GetValue("RateLimit:LoginPermit", 10);
     var captchaPermit = builder.Configuration.GetValue("RateLimit:CaptchaPermit", 60);
-    rl.AddPolicy("login", http => RateLimitPartition.GetFixedWindowLimiter(
-        ClientIp.PartitionKey(http),
-        _ => new FixedWindowRateLimiterOptions { PermitLimit = loginPermit, Window = TimeSpan.FromMinutes(1) }));
-    rl.AddPolicy("captcha", http => RateLimitPartition.GetFixedWindowLimiter(
-        ClientIp.PartitionKey(http),
-        _ => new FixedWindowRateLimiterOptions { PermitLimit = captchaPermit, Window = TimeSpan.FromMinutes(1) }));
+    // 白名单命中时给 NoLimiter 分区：IpGuard 中间件跑在本策略之前，所以标记此时已就位
+    var keyed = (Microsoft.AspNetCore.Http.HttpContext http, int permit) =>
+        http.Items.ContainsKey(IpGuardMiddleware.WhitelistedKey)
+            ? RateLimitPartition.GetNoLimiter("whitelist")
+            : RateLimitPartition.GetFixedWindowLimiter(ClientIp.PartitionKey(http),
+                _ => new FixedWindowRateLimiterOptions { PermitLimit = permit, Window = TimeSpan.FromMinutes(1) });
+    rl.AddPolicy("login", http => keyed(http, loginPermit));
+    rl.AddPolicy("captcha", http => keyed(http, captchaPermit));
 
     // 被拒必须留痕：没有这条日志，阈值是松是紧只能靠猜；留痕也才谈得上将来按 IP 做黑名单
     rl.OnRejected = async (ctx, ct) =>
@@ -116,6 +118,7 @@ builder.Services.AddScoped<NoticeService>();
 builder.Services.AddScoped<MessageService>();
 builder.Services.AddScoped<LogService>();
 builder.Services.AddScoped<OnlineService>();
+builder.Services.AddScoped<IpGuardService>();
 builder.Services.AddSingleton<LogCleanupJob>();
 builder.Services.AddSingleton<NoticePublishJob>();
 builder.Services.AddSingleton<BackupService>();
@@ -193,6 +196,8 @@ JobActivator.Current = new Panshi.Api.Jobs.ScopedJobActivator(
 app.UseSerilogRequestLogging();
 app.UseMiddleware<ExceptionMiddleware>();
 app.UseCors("web");
+// 名单闸门排在限流之前：注定要被拒的请求，不必再花一次限流与鉴权的成本
+app.UseMiddleware<IpGuardMiddleware>();
 app.UseRateLimiter();
 
 app.MapOpenApi();

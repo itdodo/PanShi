@@ -22,6 +22,24 @@ cd web && npm install && npm run dev
 docker compose up -d --build     # http://localhost:18080（API+SPA 单容器；主机 18080 → 容器 8080）
 ```
 
+## IP 黑白名单（安全 P1）
+
+监控 → IP 黑白名单（`monitor:ipguard:list` / `monitor:ipguard:manage`），接口在 `/api/v1/monitor/ip-rule`。
+规则支持裸 IP 与 CIDR，判定顺序是**白 > 黑 > 未命中**，白名单同时豁免限流。
+
+两个开关（`appsettings`，可用环境变量覆盖）：
+
+| 键 | 默认 | 含义 |
+|---|---|---|
+| `Security:IpGuard:Enabled` | `true` | 关掉即整个闸门直通 |
+| `Security:IpGuard:DryRun` | **`true`** | 命中只记 Warning 不拦。**先观察再关它** |
+
+三条必须知道的规则：
+1. **防自锁安全栏**：不允许新建覆盖「默认路由 / 受信代理 / 回环段 / 常见 docker 网关段」的黑名单，
+   保存即报错。原因见上一节——直连或容器 NAT 下所有客户端显示为同一个来源，封它就是封全站。
+2. **健康检查 `/api/v1/health` 永久豁免**，否则一次误封会让编排把容器判死并反复重启。
+3. 规则走内存缓存（10 分钟 TTL），**通过界面/接口改会立即生效**；直接改数据库要等 TTL 或重启进程。
+
 ## 验收（提交前必跑）
 
 ```bash

@@ -264,6 +264,9 @@ public static class DbSeeder
         Btn(6011, 601, "强退", "monitor:online:kick");
         Page(602, 6, "定时任务", "/monitor/job", "monitor/job/index", "monitor:job:list", "lucide:timer", 2);
         Btn(6021, 602, "管理", "monitor:job:manage");
+        Page(604, 6, "IP 黑白名单", "/monitor/ipguard", "monitor/ipguard/index", "monitor:ipguard:list",
+            "lucide:shield", 4);
+        Btn(6041, 604, "管理", "monitor:ipguard:manage");
         Page(603, 6, "服务监控", "/monitor/server", "monitor/server/index", "monitor:server:list",
             "lucide:gauge", 3);
 

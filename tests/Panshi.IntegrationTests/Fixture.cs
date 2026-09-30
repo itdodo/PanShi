@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Configuration;
 using Panshi.Common.Cache;
 using Panshi.Common.Realtime;
 using Panshi.Common.Runtime;
@@ -99,6 +100,16 @@ public class PgFixture : IAsyncLifetime
     public UserService UserService()
         => new(Repo<SysUser>(), Repo<SysUserRole>(), Repo<SysUserPosition>(), Repo<SysRole>(), Repo<SysDept>(),
             Config(), DataScope());
+
+    /// <summary>按给定开关装配一个 IP 名单服务（DryRun / 受信代理都可在测试里模拟）。</summary>
+    public IpGuardService IpGuard(bool dryRun = false, string[]? trustedProxies = null)
+        => new(Repo<SysIpRule>(), Cache(), new ConfigurationBuilder().AddInMemoryCollection(
+            new Dictionary<string, string?>
+            {
+                ["Security:IpGuard:DryRun"] = dryRun ? "true" : "false",
+                ["Security:IpGuard:Enabled"] = "true",
+                ["Security:TrustedProxies"] = string.Join(',', trustedProxies ?? [])
+            }).Build());
 
     public OnlineService Online() => new(Repo<SysUserSession>(), Repo<SysUser>(), DataScope());
 
