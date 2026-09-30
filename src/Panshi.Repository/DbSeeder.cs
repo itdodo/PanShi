@@ -273,23 +273,37 @@ public static class DbSeeder
         // 幂等哨兵（非页面权限码，红线 #14）
         Btn(9999, 2, "SEED_V1", "__seed_v1__");
 
-        db.Insertable(menus).ExecuteCommand();
+        // ⚠️ 全新库上引导顺序是 CodeFirst → 迁移 → 种子，迁移脚本可能已经插过同 ID 的行
+        // （0003 的 604/6041、0004 的基础资料菜单），整表批量插入会撞 sys_menu_pkey 直接崩在启动阶段。
+        // 所以按库里已有的 id 过滤一遍，缺哪几行补哪几行。
+        var existingIds = db.Queryable<SysMenu>().Select(m => m.Id).ToList().ToHashSet();
+        menus.RemoveAll(m => existingIds.Contains(m.Id));
+        if (menus.Count > 0) db.Insertable(menus).ExecuteCommand();
     }
 
     /// <summary>角色↔菜单：admin 全量；manager/staff 常用集（演示数据权限与审批轮转）。</summary>
     private static void SeedRoleMenus(ISqlSugarClient db)
     {
-        if (db.Queryable<SysRoleMenu>().Any(rm => rm.RoleId == 20)) return;
-
         var all = db.Queryable<SysMenu>().ToList().Select(m => m.Id).ToList();
-        var rows = all.Select(menuId => new SysRoleMenu { Id = SnowflakeId.NextId(), RoleId = 20, MenuId = menuId, CreateTime = Now }).ToList();
 
         long[] common = [1, 3, 301, 302, 303, 304, 4, 401, 4011, 4012, 4013, 4014, 402, 4021, 4022, 4023, 4024,
             2, 210];
-        foreach (var roleId in new long[] { 21, 22 })
-        foreach (var menuId in common)
-            rows.Add(new SysRoleMenu { Id = SnowflakeId.NextId(), RoleId = roleId, MenuId = menuId, CreateTime = Now });
 
-        db.Insertable(rows).ExecuteCommand();
+        // 期望集先算全，再按「已存在的 (role, menu) 对」做差集补插。
+        // 不能再拿「role 20 有任意一行就 return」当哨兵：迁移脚本会先给 role 20 塞几行授权，
+        // 那样全新库上 admin 只剩那几行，其余菜单全缺。
+        var wanted = new List<(long Role, long Menu)>(all.Select(menuId => (20L, menuId)));
+        foreach (var roleId in new long[] { 21, 22 })
+        foreach (var menuId in common) wanted.Add((roleId, menuId));
+
+        var existing = db.Queryable<SysRoleMenu>().ToList()
+            .Select(rm => (rm.RoleId, rm.MenuId)).ToHashSet();
+        var rows = wanted.Where(pair => !existing.Contains(pair))
+            .Select(pair => new SysRoleMenu
+            {
+                Id = SnowflakeId.NextId(), RoleId = pair.Role, MenuId = pair.Menu, CreateTime = Now
+            }).ToList();
+
+        if (rows.Count > 0) db.Insertable(rows).ExecuteCommand();
     }
 }
