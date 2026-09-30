@@ -130,6 +130,49 @@ export const kickOnline = (sessionId: string) => del<VoidResult>(`/monitor/onlin
 export const serverInfo = () => get<ServerInfo>('/monitor/server')
 export const hangfireConsoleUrl = '/hangfire'
 
+/**
+ * IP 黑白名单（/monitor/ip-rule，安全 P1）。
+ * 枚举对齐 Panshi.Model：IpRuleKind 1 黑 / 2 白，IpRuleSource 1 人工 / 2 自动，EnableStatus 0 正常 / 1 停用。
+ * hitCount 后端是 long → 全局 LongToString 序列化成字符串，页面比较前必须 Number() 化。
+ */
+export interface IpRuleDto {
+  id: string
+  cidr: string
+  kind: number
+  source: number
+  status: number
+  reason?: string | null
+  expiresTime?: string | null
+  hitCount: string
+  lastHitTime?: string | null
+  createTime: string
+  version: number
+}
+export interface IpRuleQuery extends PageQuery {
+  keyword?: string
+  kind?: number | null
+  status?: number | null
+}
+export interface IpRuleForm {
+  cidr: string
+  kind: number
+  status: number
+  reason?: string | null
+  /** 本地时区 'YYYY-MM-DD HH:mm:ss'，与后端 DateTime.Now 同基准 */
+  expiresTime?: string | null
+  version?: number
+}
+/** DryRun / Enabled 来自 appsettings（不在 sys_config，管理端改不了），页面只做只读提示 */
+export interface IpGuardStatus {
+  enabled: boolean
+  dryRun: boolean
+}
+export const pageIpRules = (q: IpRuleQuery) => get<PagedResult<IpRuleDto>>('/monitor/ip-rule/page', q)
+export const ipGuardStatus = () => get<IpGuardStatus>('/monitor/ip-rule/status')
+export const createIpRule = (d: IpRuleForm) => post<IpRuleDto>('/monitor/ip-rule', d)
+export const updateIpRule = (id: string, d: IpRuleForm) => put<VoidResult>(`/monitor/ip-rule/${id}`, d)
+export const deleteIpRule = (id: string) => del<VoidResult>(`/monitor/ip-rule/${id}`)
+
 /** 站内信发送补充（/sys/message send——my 系列已在别处）。id 用字符串，避免雪花 id 走 Number 丢精度 */
 export const sendMessage = (d: { receiverIds: (string | number)[]; title: string; content?: string }) =>
   post<VoidResult>('/sys/message/send', d)
