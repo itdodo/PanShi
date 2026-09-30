@@ -22,6 +22,7 @@ using Panshi.Repository;
 using Panshi.Service.Auth;
 using Panshi.Service.Biz;
 using Panshi.Service.Flow;
+using Panshi.Service.Md;
 using Panshi.Service.Base;
 using Panshi.Service.Sys;
 using Serilog;
@@ -128,6 +129,9 @@ builder.Services.AddScoped<FlowAdminService>();
 builder.Services.AddScoped<FlowQueryService>();
 builder.Services.AddScoped<ExpenseService>();
 builder.Services.AddScoped<PurchaseService>();
+builder.Services.AddScoped<MaterialService>();
+builder.Services.AddScoped<SupplierService>();
+builder.Services.AddScoped<CustomerService>();
 builder.Services.AddScoped<FileAccessService>();
 // 红线 #7：IFlowBusinessHandler 多实现必须 AddScoped（TryAdd 只收第一个）
 builder.Services.AddScoped<IFlowBusinessHandler, ExpenseFlowHandler>();
