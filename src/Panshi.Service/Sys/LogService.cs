@@ -52,8 +52,9 @@ public class LogService(
         var exp = Expressionable.Create<SysLoginLog>();
         if (!string.IsNullOrEmpty(userName)) exp.And(l => l.UserName.Contains(userName));
         if (query.Success is not null) exp.And(l => l.Success == query.Success!.Value);
+        // 端点含头含尾：前端传的 end 已是当天 23:59:59（本地时区），再 +1 天会多框出一整天
         if (query.Begin is DateTime b) exp.And(l => l.CreateTime >= b);
-        if (query.End is DateTime e) exp.And(l => l.CreateTime <= e.AddDays(1));
+        if (query.End is DateTime e) exp.And(l => l.CreateTime <= e);
         var names = await dataScope.VisibleUserNamesAsync(userId);
         if (names is not null)
         {
@@ -126,8 +127,9 @@ public class LogService(
         if (!string.IsNullOrEmpty(module)) exp.And(l => l.Module.Contains(module));
         if (!string.IsNullOrEmpty(userName)) exp.And(l => l.UserName!.Contains(userName));
         if (query.Success is not null) exp.And(l => l.Success == query.Success!.Value);
+        // 端点含头含尾：前端传的 end 已是当天 23:59:59（本地时区），再 +1 天会多框出一整天
         if (query.Begin is DateTime b) exp.And(l => l.CreateTime >= b);
-        if (query.End is DateTime e) exp.And(l => l.CreateTime <= e.AddDays(1));
+        if (query.End is DateTime e) exp.And(l => l.CreateTime <= e);
         var names = await dataScope.VisibleUserNamesAsync(userId);
         if (names is not null)
         {
