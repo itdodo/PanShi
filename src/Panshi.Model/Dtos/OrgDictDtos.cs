@@ -341,6 +341,11 @@ public class ChangeLogQuery : PagedQuery
     public string? UserName { get; set; }
 
     public string? RecordId { get; set; }
+
+    /// <summary>区间与登录/操作日志同约定：前端给本地时区的 startOf/endOf day，后端不再放宽。</summary>
+    public DateTime? Begin { get; set; }
+
+    public DateTime? End { get; set; }
 }
 
 public class OperLogDto

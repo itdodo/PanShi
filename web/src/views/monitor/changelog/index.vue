@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { h, ref, type VNode } from 'vue'
+import dayjs from 'dayjs'
 import {
   NButton,
   NCard,
   NCode,
   NDataTable,
+  NDatePicker,
   NForm,
   NFormItem,
   NInput,
@@ -21,13 +23,23 @@ import { message } from '@/utils/feedback'
 import { formatDateTime } from '@/utils/format'
 
 /**
- * 变更日志（/sys/log/change）：表名/操作人/记录ID 查询 + 行展开看字段级前后值 + 按天清理。
+ * 变更日志（/sys/log/change）：表名/操作人/记录ID/时间区间 查询 + 行展开看字段级前后值 + 按天清理。
  * 权限：monitor:changelog:list（菜单级）/ monitor:changelog:clean。
  */
 type ChangeLogFilter = {
   tableName: string
   userName: string
   recordId: string
+  begin?: string
+  end?: string
+}
+
+/** 日期区间 → begin/end：本地时区 ISO 串，与后端 DateTime.Now 同基准（避免 UTC 偏移一天） */
+function toBegin(ms: number): string {
+  return dayjs(ms).startOf('day').format('YYYY-MM-DDTHH:mm:ss')
+}
+function toEnd(ms: number): string {
+  return dayjs(ms).endOf('day').format('YYYY-MM-DDTHH:mm:ss')
 }
 
 /** 变更条目：后端 AuditDiff 用默认 JsonSerializerOptions（键 PascalCase），此处两种命名都兼容 */
@@ -41,10 +53,24 @@ interface ChangeItem {
 const { queryParams, loading, data, total, pagination, search, reset, load } = usePageList<ChangeLogDto, ChangeLogFilter>(
   {
     fetcher: (query) => pageChangeLogs(query),
-    defaultQuery: () => ({ tableName: '', userName: '', recordId: '' }),
+    defaultQuery: () => ({ tableName: '', userName: '', recordId: '', begin: undefined, end: undefined }),
     pageSize: 20
   }
 )
+
+const rangeValue = ref<[number, number] | null>(null)
+
+function onRangeUpdate(value: number | [number, number] | null): void {
+  const pair = Array.isArray(value) ? value : null
+  rangeValue.value = pair ? [Number(pair[0]), Number(pair[1])] : null
+  queryParams.begin = pair ? toBegin(pair[0]) : undefined
+  queryParams.end = pair ? toEnd(pair[1]) : undefined
+}
+
+async function onReset(): Promise<void> {
+  rangeValue.value = null
+  await reset()
+}
 
 /* ------------------------------ 展开行：字段级 diff ------------------------------ */
 const cellStyle = 'font-size:12px;line-height:1.7;word-break:break-all'
@@ -188,7 +214,8 @@ const columns: DataTableColumns<ChangeLogDto> = [
       )
     }
   },
-  { title: '时间', key: 'createTime', width: 170, sorter: true, render: (row) => formatDateTime(row.createTime) }
+  // 钉右：本表 scroll-x 1150，窄窗口横向滚动时最后一列会被裁出可视区（「看不到时间」的真因）
+  { title: '时间', key: 'createTime', width: 170, sorter: true, fixed: 'right', render: (row) => formatDateTime(row.createTime) }
 ]
 
 /* -------------------------------- 清理弹窗 -------------------------------- */
@@ -247,10 +274,19 @@ async function onClean(): Promise<boolean> {
             @keyup.enter="search"
           />
         </NFormItem>
+        <NFormItem label="时间">
+          <NDatePicker
+            :value="rangeValue"
+            type="daterange"
+            clearable
+            style="width: 260px"
+            @update:value="onRangeUpdate"
+          />
+        </NFormItem>
         <NFormItem>
           <NSpace :size="8">
             <NButton type="primary" @click="search">查询</NButton>
-            <NButton tertiary @click="reset">重置</NButton>
+            <NButton tertiary @click="onReset">重置</NButton>
           </NSpace>
         </NFormItem>
       </NForm>

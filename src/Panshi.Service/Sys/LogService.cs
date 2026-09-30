@@ -94,6 +94,9 @@ public class LogService(
         if (!string.IsNullOrEmpty(tableName)) exp.And(c => c.TableName == tableName);
         if (!string.IsNullOrEmpty(userName)) exp.And(c => c.UserName.Contains(userName));
         if (long.TryParse(query.RecordId, out var rid) && rid > 0) exp.And(c => c.RecordId == rid);
+        // 端点按「含头含尾」处理：前端传的 end 已是当天 23:59:59（本地时区），不再 +1 天
+        if (query.Begin is DateTime b) exp.And(c => c.CreateTime >= b);
+        if (query.End is DateTime e) exp.And(c => c.CreateTime <= e);
         var names = await dataScope.VisibleUserNamesAsync(userId);
         if (names is not null)
         {

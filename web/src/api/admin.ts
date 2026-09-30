@@ -80,6 +80,9 @@ export interface ChangeLogQuery extends PageQuery {
   tableName?: string
   userName?: string
   recordId?: string
+  /** 本地时区 ISO 串；end 传当天 23:59:59，后端按含尾处理 */
+  begin?: string
+  end?: string
 }
 
 export const pageOperLogs = (q: OperLogQuery) => get<PagedResult<OperLogDto>>('/sys/log/operation', q)
