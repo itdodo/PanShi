@@ -184,19 +184,19 @@ const columns = computed<DataTableColumns<Row>>(() => [
       h(NSpace, { size: 10 }, {
         default: () => [
           hasPerm('basedata:price:edit')
-            ? h(NButton, { size: 'tiny', text: true, type: 'primary', onClick: () => openEdit(row) }, { default: () => '编辑' })
+            ? h(NButton, { key: 'edit', size: 'tiny', text: true, type: 'primary', onClick: () => openEdit(row) }, { default: () => '编辑' })
             : null,
           hasPerm('basedata:price:delete')
             ? h(
                 NPopconfirm,
-                { onPositiveClick: () => remove(row) },
+                { key: 'delete', onPositiveClick: () => remove(row) },
                 {
                   trigger: () => h(NButton, { size: 'tiny', text: true, type: 'error' }, { default: () => '删除' }),
                   default: () => `删除「${row.supplierName} × ${row.materialName}」的协议价？`
                 }
               )
             : null
-        ]
+        ].filter(Boolean)
       })
   }
 ])

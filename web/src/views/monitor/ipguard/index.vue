@@ -255,19 +255,19 @@ const columns = computed<DataTableColumns<IpRuleDto>>(() => [
       h(NSpace, { size: 10 }, {
         default: () => [
           hasPerm('monitor:ipguard:manage')
-            ? h(NButton, { size: 'tiny', text: true, type: 'primary', onClick: () => openEdit(row) }, { default: () => '编辑' })
+            ? h(NButton, { key: 'edit', size: 'tiny', text: true, type: 'primary', onClick: () => openEdit(row) }, { default: () => '编辑' })
             : null,
           hasPerm('monitor:ipguard:manage')
             ? h(
                 NPopconfirm,
-                { onPositiveClick: () => remove(row) },
+                { key: 'delete', onPositiveClick: () => remove(row) },
                 {
                   trigger: () => h(NButton, { size: 'tiny', text: true, type: 'error' }, { default: () => '删除' }),
                   default: () => `删除「${row.cidr}」？判定缓存会立即失效。`
                 }
               )
             : null
-        ]
+        ].filter(Boolean)
       })
   }
 ])

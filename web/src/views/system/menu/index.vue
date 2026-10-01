@@ -318,24 +318,24 @@ const columns = computed<DataTableColumns<MenuTreeNode>>(() => [
           hasPerm('sys:menu:add') && row.menuType !== MENU_TYPE.Button
             ? h(
                 NButton,
-                { size: 'tiny', text: true, type: 'primary', onClick: () => openCreate(row) },
+                { key: 'add', size: 'tiny', text: true, type: 'primary', onClick: () => openCreate(row) },
                 { default: () => '加下级' }
               )
             : null,
           hasPerm('sys:menu:edit')
-            ? h(NButton, { size: 'tiny', text: true, type: 'info', onClick: () => openEdit(row) }, { default: () => '编辑' })
+            ? h(NButton, { key: 'edit', size: 'tiny', text: true, type: 'info', onClick: () => openEdit(row) }, { default: () => '编辑' })
             : null,
           hasPerm('sys:menu:delete')
             ? h(
                 NPopconfirm,
-                { onPositiveClick: () => remove(row) },
+                { key: 'delete', onPositiveClick: () => remove(row) },
                 {
                   trigger: () => h(NButton, { size: 'tiny', text: true, type: 'error' }, { default: () => '删除' }),
                   default: () => `删除「${row.menuName}」？存在子菜单时后端会拒绝。`
                 }
               )
             : null
-        ]
+        ].filter(Boolean)
       })
   }
 ])

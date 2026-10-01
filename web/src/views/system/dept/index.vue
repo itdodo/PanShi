@@ -231,22 +231,22 @@ const columns = computed<DataTableColumns<DeptRow>>(() => [
       h(NSpace, { size: 10 }, {
         default: () => [
           hasPerm('sys:dept:add')
-            ? h(NButton, { size: 'tiny', text: true, type: 'primary', onClick: () => openCreate(row) }, { default: () => '加下级' })
+            ? h(NButton, { key: 'add', size: 'tiny', text: true, type: 'primary', onClick: () => openCreate(row) }, { default: () => '加下级' })
             : null,
           hasPerm('sys:dept:edit')
-            ? h(NButton, { size: 'tiny', text: true, type: 'info', onClick: () => openEdit(row) }, { default: () => '编辑' })
+            ? h(NButton, { key: 'edit', size: 'tiny', text: true, type: 'info', onClick: () => openEdit(row) }, { default: () => '编辑' })
             : null,
           hasPerm('sys:dept:delete')
             ? h(
                 NPopconfirm,
-                { onPositiveClick: () => remove(row) },
+                { key: 'delete', onPositiveClick: () => remove(row) },
                 {
                   trigger: () => h(NButton, { size: 'tiny', text: true, type: 'error' }, { default: () => '删除' }),
                   default: () => `删除部门「${row.deptName}」？有子部门或已挂用户时后端会拒绝。`
                 }
               )
             : null
-        ]
+        ].filter(Boolean)
       })
   }
 ])

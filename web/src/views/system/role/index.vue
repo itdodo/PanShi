@@ -298,22 +298,22 @@ const columns = computed<DataTableColumns<RoleRow>>(() => [
       return h(NSpace, { size: 10 }, {
         default: () => [
           hasPerm('sys:role:edit') && !builtIn
-            ? h(NButton, { size: 'tiny', text: true, type: 'primary', onClick: () => openEdit(row) }, { default: () => '编辑' })
+            ? h(NButton, { key: 'edit', size: 'tiny', text: true, type: 'primary', onClick: () => openEdit(row) }, { default: () => '编辑' })
             : null,
           hasPerm('sys:role:edit') && !builtIn
-            ? h(NButton, { size: 'tiny', text: true, type: 'info', onClick: () => openGrant(row) }, { default: () => '授权菜单' })
+            ? h(NButton, { key: 'grant', size: 'tiny', text: true, type: 'info', onClick: () => openGrant(row) }, { default: () => '授权菜单' })
             : null,
           hasPerm('sys:role:delete') && !builtIn
             ? h(
                 NPopconfirm,
-                { onPositiveClick: () => remove(row) },
+                { key: 'delete', onPositiveClick: () => remove(row) },
                 {
                   trigger: () => h(NButton, { size: 'tiny', text: true, type: 'error' }, { default: () => '删除' }),
                   default: () => `删除角色「${row.roleName}」将同时解除其菜单授权，确定？`
                 }
               )
             : null
-        ]
+        ].filter(Boolean)
       })
     }
   }

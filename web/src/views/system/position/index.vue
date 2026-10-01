@@ -160,19 +160,19 @@ const columns = computed<DataTableColumns<PositionRow>>(() => [
       h(NSpace, { size: 10 }, {
         default: () => [
           hasPerm('sys:position:edit')
-            ? h(NButton, { size: 'tiny', text: true, type: 'primary', onClick: () => openEdit(row) }, { default: () => '编辑' })
+            ? h(NButton, { key: 'edit', size: 'tiny', text: true, type: 'primary', onClick: () => openEdit(row) }, { default: () => '编辑' })
             : null,
           hasPerm('sys:position:delete')
             ? h(
                 NPopconfirm,
-                { onPositiveClick: () => remove(row) },
+                { key: 'delete', onPositiveClick: () => remove(row) },
                 {
                   trigger: () => h(NButton, { size: 'tiny', text: true, type: 'error' }, { default: () => '删除' }),
                   default: () => `删除岗位「${row.positionName}」？已挂在用户上时后端会拒绝。`
                 }
               )
             : null
-        ]
+        ].filter(Boolean)
       })
   }
 ])

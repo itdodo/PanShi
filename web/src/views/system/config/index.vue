@@ -156,19 +156,19 @@ const columns = computed<DataTableColumns<ConfigRow>>(() => [
       h(NSpace, { size: 10 }, {
         default: () => [
           hasPerm('sys:config:edit')
-            ? h(NButton, { size: 'tiny', text: true, type: 'primary', onClick: () => openEdit(row) }, { default: () => '编辑' })
+            ? h(NButton, { key: 'edit', size: 'tiny', text: true, type: 'primary', onClick: () => openEdit(row) }, { default: () => '编辑' })
             : null,
           hasPerm('sys:config:delete') && !row.builtIn
             ? h(
                 NPopconfirm,
-                { onPositiveClick: () => remove(row) },
+                { key: 'delete', onPositiveClick: () => remove(row) },
                 {
                   trigger: () => h(NButton, { size: 'tiny', text: true, type: 'error' }, { default: () => '删除' }),
                   default: () => `删除参数「${row.configName}」？`
                 }
               )
             : null
-        ]
+        ].filter(Boolean)
       })
   }
 ])

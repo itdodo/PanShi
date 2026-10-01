@@ -236,21 +236,21 @@ const columns = computed<DataTableColumns<NoticeRow>>(() => [
     render: (row) =>
       h(NSpace, { size: 10 }, {
         default: () => [
-          h(NButton, { size: 'tiny', text: true, onClick: () => openDetail(row) }, { default: () => '详情' }),
+          h(NButton, { key: 'detail', size: 'tiny', text: true, onClick: () => openDetail(row) }, { default: () => '详情' }),
           hasPerm('sys:notice:edit')
-            ? h(NButton, { size: 'tiny', text: true, type: 'primary', onClick: () => openEdit(row) }, { default: () => '编辑' })
+            ? h(NButton, { key: 'edit', size: 'tiny', text: true, type: 'primary', onClick: () => openEdit(row) }, { default: () => '编辑' })
             : null,
           hasPerm('sys:notice:delete')
             ? h(
                 NPopconfirm,
-                { onPositiveClick: () => remove(row) },
+                { key: 'delete', onPositiveClick: () => remove(row) },
                 {
                   trigger: () => h(NButton, { size: 'tiny', text: true, type: 'error' }, { default: () => '删除' }),
                   default: () => `删除公告「${row.title}」？`
                 }
               )
             : null
-        ]
+        ].filter(Boolean)
       })
   }
 ])

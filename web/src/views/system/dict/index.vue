@@ -68,19 +68,19 @@ const typeColumns = computed<DataTableColumns<DictTypeRow>>(() => [
       h(NSpace, { size: 8 }, {
         default: () => [
           hasPerm('sys:dict:edit')
-            ? h(NButton, { size: 'tiny', text: true, type: 'primary', onClick: () => openTypeEdit(row) }, { default: () => '编辑' })
+            ? h(NButton, { key: 'edit', size: 'tiny', text: true, type: 'primary', onClick: () => openTypeEdit(row) }, { default: () => '编辑' })
             : null,
           hasPerm('sys:dict:delete')
             ? h(
                 NPopconfirm,
-                { onPositiveClick: () => removeType(row) },
+                { key: 'delete', onPositiveClick: () => removeType(row) },
                 {
                   trigger: () => h(NButton, { size: 'tiny', text: true, type: 'error' }, { default: () => '删除' }),
                   default: () => `删除类型「${row.dictName}」及其数据项？`
                 }
               )
             : null
-        ]
+        ].filter(Boolean)
       })
   }
 ])
@@ -226,19 +226,19 @@ const dataColumns = computed<DataTableColumns<DictDataRow>>(() => [
       h(NSpace, { size: 8 }, {
         default: () => [
           hasPerm('sys:dict:edit')
-            ? h(NButton, { size: 'tiny', text: true, type: 'primary', onClick: () => openDataEdit(row) }, { default: () => '编辑' })
+            ? h(NButton, { key: 'edit', size: 'tiny', text: true, type: 'primary', onClick: () => openDataEdit(row) }, { default: () => '编辑' })
             : null,
           hasPerm('sys:dict:delete')
             ? h(
                 NPopconfirm,
-                { onPositiveClick: () => removeDataItem(row) },
+                { key: 'delete', onPositiveClick: () => removeDataItem(row) },
                 {
                   trigger: () => h(NButton, { size: 'tiny', text: true, type: 'error' }, { default: () => '删除' }),
                   default: () => `删除数据项「${row.label}」？`
                 }
               )
             : null
-        ]
+        ].filter(Boolean)
       })
   }
 ])
