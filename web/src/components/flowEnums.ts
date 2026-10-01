@@ -102,11 +102,14 @@ export function nodeTypeLabel(type?: string | null): string {
 }
 
 /* -------------------------------- 业务单据 -------------------------------- */
-export type BizTable = 'biz_expense' | 'biz_purchase_request'
+export type BizTable = 'biz_expense' | 'biz_purchase_request' | 'scm_purchase_order' | 'scm_sales_order'
 
+/** 可绑流程的业务表。库存单据刻意不在列——它走「过账」即时生效，挂审批只会把仓库作业卡住。 */
 const BIZ_TABLES: Record<string, { label: string; route: string }> = {
   biz_expense: { label: '报销单', route: '/biz/expense' },
-  biz_purchase_request: { label: '采购申请单', route: '/biz/purchase' }
+  biz_purchase_request: { label: '采购申请单', route: '/biz/purchase' },
+  scm_purchase_order: { label: '采购订单', route: '/scm/purchase-order' },
+  scm_sales_order: { label: '销售订单', route: '/scm/sales-order' }
 }
 
 export function bizTableLabel(table?: string | null): string {

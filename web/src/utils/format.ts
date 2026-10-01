@@ -24,6 +24,12 @@ export function fromNow(value?: string | Date | null): string {
   return d.isValid() ? d.fromNow() : '-'
 }
 
+/** 数量列：库里按 numeric(18,4) 存，展示去掉无意义的尾 0（6.0000 → 6） */
+export function formatQty(value?: number | string | null, digits = 4): string {
+  const n = Number(value ?? 0)
+  return Number.isFinite(n) ? String(Number(n.toFixed(digits))) : '-'
+}
+
 /** UserAgent 简写（会话列表展示） */
 export function shortUserAgent(ua?: string | null): string {
   if (!ua) return '未知设备'

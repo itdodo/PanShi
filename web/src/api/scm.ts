@@ -140,3 +140,143 @@ export function lineAmount(qty: number, price: number): number {
   const raw = (Number(qty) || 0) * (Number(price) || 0)
   return Math.round((raw + Number.EPSILON) * 100) / 100
 }
+
+/* ------------------------------- 库存三块 ------------------------------- */
+
+/** 单据类型：1 采购入库 2 销售出库 3 其他入库 4 其他出库 5 调拨 6 盘点（前缀 RK/CK/QRK/QCK/DB/PD） */
+export const STOCK_KINDS = [
+  { label: '采购入库', value: 1 },
+  { label: '销售出库', value: 2 },
+  { label: '其他入库', value: 3 },
+  { label: '其他出库', value: 4 },
+  { label: '调拨', value: 5 },
+  { label: '盘点', value: 6 }
+] as const
+
+/** 单据状态：0 草稿（不碰库存）/ 1 已过账（锁定）/ 2 已作废（按流水反向冲销） */
+export const STOCK_STATUS = { Draft: 0, Posted: 1, Void: 2 } as const
+
+export const stockKindLabel = (kind?: number | null): string =>
+  STOCK_KINDS.find((k) => k.value === kind)?.label ?? '未知'
+
+export function stockStatusMeta(status?: number | null): { label: string; type: 'default' | 'warning' | 'success' | 'error' } {
+  if (status === STOCK_STATUS.Posted) return { label: '已过账', type: 'success' }
+  if (status === STOCK_STATUS.Void) return { label: '已作废', type: 'error' }
+  return { label: '草稿', type: 'warning' }
+}
+
+export interface StockDocLineDto {
+  id: string
+  materialId: string
+  materialCode: string
+  materialName: string
+  spec?: string | null
+  unit?: string | null
+  quantity: number
+  /** 盘点单回填的当前账面数，用于显示差异 */
+  bookQty?: number | null
+  remark?: string | null
+}
+
+export interface StockDocDto {
+  id: string
+  docNo: string
+  kind: number
+  warehouseId: string
+  warehouseName: string
+  targetWarehouseId?: string | null
+  targetWarehouseName?: string | null
+  bizDate: string
+  sourceOrderNo?: string | null
+  totalQty: number
+  status: number
+  postedTime?: string | null
+  ownerUserId: string
+  ownerUserName: string
+  remark?: string | null
+  createTime: string
+  version: number
+  lineCount: number
+  lines: StockDocLineDto[]
+}
+
+export interface StockDocLineForm {
+  materialId: string
+  quantity: number
+  remark?: string | null
+}
+
+export interface StockDocForm {
+  kind: number
+  warehouseId: string
+  targetWarehouseId?: string | null
+  bizDate: string
+  sourceOrderNo?: string | null
+  remark?: string | null
+  lines: StockDocLineForm[]
+  version?: number
+}
+
+export interface StockDocQuery extends PageQuery {
+  keyword?: string
+  kind?: number | null
+  status?: number | null
+  warehouseId?: string | null
+  mine?: boolean
+  begin?: string
+  end?: string
+}
+
+export const pageStockDocs = (q: StockDocQuery) => get<PagedResult<StockDocDto>>('/scm/stock-doc/page', q)
+export const getStockDoc = (id: string) => get<StockDocDto>(`/scm/stock-doc/${id}`)
+export const createStockDoc = (d: StockDocForm) => post<StockDocDto>('/scm/stock-doc', d)
+export const updateStockDoc = (id: string, d: StockDocForm) => put<VoidResult>(`/scm/stock-doc/${id}`, d)
+export const deleteStockDoc = (id: string) => del<VoidResult>(`/scm/stock-doc/${id}`)
+export const postStockDoc = (id: string) => post<StockDocDto>(`/scm/stock-doc/${id}/post`)
+export const voidStockDoc = (id: string) => post<StockDocDto>(`/scm/stock-doc/${id}/void`)
+
+export interface StockDto {
+  id: string
+  warehouseId: string
+  warehouseName: string
+  materialId: string
+  materialCode: string
+  materialName: string
+  spec?: string | null
+  unit?: string | null
+  quantity: number
+  updateTime?: string | null
+}
+export interface StockQuery extends PageQuery {
+  keyword?: string
+  warehouseId?: string | null
+  onlyPositive?: boolean
+}
+export const pageStocks = (q: StockQuery) => get<PagedResult<StockDto>>('/scm/stock/page', q)
+
+export interface LedgerDto {
+  id: string
+  docId: string
+  docNo: string
+  kind: number
+  warehouseId: string
+  warehouseName: string
+  materialId: string
+  materialCode: string
+  materialName: string
+  unit?: string | null
+  changeQty: number
+  beforeQty: number
+  afterQty: number
+  bizTime: string
+  operatorName: string
+}
+export interface LedgerQuery extends PageQuery {
+  keyword?: string
+  kind?: number | null
+  warehouseId?: string | null
+  materialId?: string | null
+  begin?: string
+  end?: string
+}
+export const pageLedger = (q: LedgerQuery) => get<PagedResult<LedgerDto>>('/scm/ledger/page', q)

@@ -111,6 +111,14 @@ public class PgFixture : IAsyncLifetime
     public PriceAgreementService Prices()
         => new(Repo<MdPriceAgreement>(), Repo<MdSupplier>(), Repo<MdMaterial>());
 
+    public StockDocService StockDocs()
+        => new(Repo<ScmStockDoc>(), Repo<ScmStockDocLine>(), Repo<ScmStock>(), Repo<ScmStockLedger>(),
+            Repo<MdMaterial>(), Repo<MdWarehouse>(), DataScope());
+
+    public StockService Stocks() => new(Repo<ScmStock>());
+
+    public LedgerService Ledgers() => new(Repo<ScmStockLedger>());
+
     public PurchaseOrderService PurchaseOrders()
         => new(Repo<ScmPurchaseOrder>(), Repo<ScmPurchaseOrderLine>(), Repo<MdSupplier>(), Repo<MdMaterial>(),
             Repo<BizPurchaseRequest>(), Engine(), DataScope());

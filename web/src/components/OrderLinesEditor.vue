@@ -19,6 +19,8 @@ export interface MaterialChoice {
 const props = defineProps<{
   materials: MaterialChoice[]
   readonly?: boolean
+  /** 库存单据只要数量：隐藏单价/税率/金额三列，合计也只报数量 */
+  quantityOnly?: boolean
   /** 选料后带出协议价（采购页传入；不传就不自动填价） */
   quote?: (materialId: string) => Promise<{ unitPrice: number; taxRate: number } | null>
 }>()
@@ -102,42 +104,47 @@ const columns = computed<DataTableColumns<OrderLineForm>>(() => [
         'onUpdate:value': (v: number | null) => (row.quantity = v ?? 0)
       })
   },
-  {
-    title: '含税单价',
-    key: 'unitPrice',
-    width: 128,
-    render: (row) =>
-      h(NInputNumber, {
-        value: row.unitPrice,
-        min: 0,
-        precision: 4,
-        size: 'small',
-        disabled: props.readonly,
-        'onUpdate:value': (v: number | null) => (row.unitPrice = v ?? 0)
-      })
-  },
-  {
-    title: '税率%',
-    key: 'taxRate',
-    width: 104,
-    render: (row) =>
-      h(NInputNumber, {
-        value: row.taxRate,
-        min: 0,
-        max: 100,
-        precision: 2,
-        size: 'small',
-        disabled: props.readonly,
-        'onUpdate:value': (v: number | null) => (row.taxRate = v ?? 0)
-      })
-  },
-  {
-    title: '金额',
-    key: 'amount',
-    width: 110,
-    render: (row) =>
-      h('span', { style: 'font-variant-numeric: tabular-nums' }, lineAmount(row.quantity, row.unitPrice).toFixed(2))
-  },
+  ...(props.quantityOnly
+    ? []
+    : [
+        {
+          title: '含税单价',
+          key: 'unitPrice',
+          width: 128,
+          render: (row) =>
+            h(NInputNumber, {
+              value: row.unitPrice,
+              min: 0,
+              precision: 4,
+              size: 'small',
+              disabled: props.readonly,
+              'onUpdate:value': (v: number | null) => (row.unitPrice = v ?? 0)
+            })
+        } as DataTableColumns<OrderLineForm>[number],
+        {
+          title: '税率%',
+          key: 'taxRate',
+          width: 104,
+          render: (row) =>
+            h(NInputNumber, {
+              value: row.taxRate,
+              min: 0,
+              max: 100,
+              precision: 2,
+              size: 'small',
+              disabled: props.readonly,
+              'onUpdate:value': (v: number | null) => (row.taxRate = v ?? 0)
+            })
+        } as DataTableColumns<OrderLineForm>[number],
+        {
+          title: '金额',
+          key: 'amount',
+          width: 110,
+          render: (row) =>
+            h('span', { style: 'font-variant-numeric: tabular-nums' },
+              lineAmount(row.quantity, row.unitPrice).toFixed(2))
+        } as DataTableColumns<OrderLineForm>[number]
+      ]),
   {
     title: '备注',
     key: 'remark',
@@ -176,9 +183,8 @@ const columns = computed<DataTableColumns<OrderLineForm>>(() => [
       <NButton v-if="!props.readonly" size="small" tertiary type="primary" @click="addLine">+ 添加明细行</NButton>
       <span v-else class="ps-muted">只读</span>
       <span class="ps-muted">
-        合计
-        <b>{{ totals.qty }}</b> 数量 /
-        <b>{{ totals.amount.toFixed(2) }}</b> 金额（后端复核）
+        合计 <b>{{ totals.qty }}</b> 数量<template v-if="!props.quantityOnly"> /
+        <b>{{ totals.amount.toFixed(2) }}</b> 金额（后端复核）</template>
       </span>
     </NSpace>
     <NDataTable
@@ -188,7 +194,7 @@ const columns = computed<DataTableColumns<OrderLineForm>>(() => [
       size="small"
       :bordered="false"
       :max-height="300"
-      :scroll-x="1150"
+      :scroll-x="props.quantityOnly ? 820 : 1150"
     />
   </div>
 </template>

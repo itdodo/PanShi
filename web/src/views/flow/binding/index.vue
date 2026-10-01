@@ -31,7 +31,9 @@ import { hasPerm } from '@/directives/permission'
  */
 const BIZ_TABLE_CHOICES: SelectOption[] = [
   { label: '报销单（biz_expense）', value: 'biz_expense' },
-  { label: '采购申请单（biz_purchase_request）', value: 'biz_purchase_request' }
+  { label: '采购申请单（biz_purchase_request）', value: 'biz_purchase_request' },
+  { label: '采购订单（scm_purchase_order）', value: 'scm_purchase_order' },
+  { label: '销售订单（scm_sales_order）', value: 'scm_sales_order' }
 ]
 
 const rows = ref<FlowBindingDto[]>([])

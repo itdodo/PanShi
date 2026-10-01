@@ -165,3 +165,44 @@ public enum IpRuleSource
     /// <summary>系统自动（如凭据滥用作动）</summary>
     Auto = 2
 }
+
+/// <summary>
+/// 库存单据类型。方向决定过账符号：入库类 +、出库类 -、调拨一单双边、盘点按差额。
+/// 编号前缀见 StockDocService.Prefixes。
+/// </summary>
+public enum StockDocKind
+{
+    /// <summary>采购入库（RK）</summary>
+    PurchaseIn = 1,
+
+    /// <summary>销售出库（CK）</summary>
+    SalesOut = 2,
+
+    /// <summary>其他入库（QRK）</summary>
+    OtherIn = 3,
+
+    /// <summary>其他出库（QCK）</summary>
+    OtherOut = 4,
+
+    /// <summary>调拨（DB，源仓出、目标仓入）</summary>
+    Transfer = 5,
+
+    /// <summary>盘点（PD，行填实盘数，过账按「实盘 − 账面」生成差额）</summary>
+    Count = 6
+}
+
+/// <summary>
+/// 库存单据状态。刻意不复用 BizDocStatus：出入库要即时，不挂审批流，
+/// 「已过账」才是它唯一有副作用的状态（写台账 + 记流水）。
+/// </summary>
+public enum StockDocStatus
+{
+    /// <summary>草稿：可改可删，未影响库存</summary>
+    Draft = 0,
+
+    /// <summary>已过账：库存已变动，单据与明细一律锁定</summary>
+    Posted = 1,
+
+    /// <summary>已作废：过账后发现错，用反向单冲销后作废本单</summary>
+    Void = 2
+}

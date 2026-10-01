@@ -137,6 +137,9 @@ builder.Services.AddScoped<WarehouseService>();
 builder.Services.AddScoped<PriceAgreementService>();
 builder.Services.AddScoped<PurchaseOrderService>();
 builder.Services.AddScoped<SalesOrderService>();
+builder.Services.AddScoped<StockDocService>();
+builder.Services.AddScoped<StockService>();
+builder.Services.AddScoped<LedgerService>();
 builder.Services.AddScoped<FileAccessService>();
 // 红线 #7：IFlowBusinessHandler 多实现必须 AddScoped（TryAdd 只收第一个）
 builder.Services.AddScoped<IFlowBusinessHandler, ExpenseFlowHandler>();

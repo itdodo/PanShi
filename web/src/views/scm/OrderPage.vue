@@ -202,6 +202,11 @@ function toModel() {
   }
 }
 
+/** preset="card" 的弹窗没有 dialog 的 positive-click，保存成功后要自己收起，否则再点一次就是重复建单 */
+async function saveAndClose(): Promise<void> {
+  if (await submit()) modalVisible.value = false
+}
+
 async function submit(): Promise<boolean> {
   const invalid = await formRef.value?.validate().then(() => false).catch(() => true)
   if (invalid) return false
@@ -297,14 +302,15 @@ const columns = computed<DataTableColumns<OrderRow>>(() => [
     fixed: 'right',
     render: (row) =>
       h(NSpace, { size: 10 }, {
+        // 每项带 key 并滤掉 null：状态一变动作集就换一套，无 key 的空洞会让 NSpace 留下上一个弹层的触发器
         default: () => [
           hasPerm(`${kind.perm}:edit`) && editable(row)
-            ? h(NButton, { size: 'tiny', text: true, type: 'primary', onClick: () => openRow(row, 'edit') }, { default: () => '编辑' })
-            : h(NButton, { size: 'tiny', text: true, onClick: () => openRow(row, 'view') }, { default: () => '查看' }),
+            ? h(NButton, { key: 'edit', size: 'tiny', text: true, type: 'primary', onClick: () => openRow(row, 'edit') }, { default: () => '编辑' })
+            : h(NButton, { key: 'view', size: 'tiny', text: true, onClick: () => openRow(row, 'view') }, { default: () => '查看' }),
           hasPerm(`${kind.perm}:submit`) && editable(row)
             ? h(
                 NPopconfirm,
-                { onPositiveClick: () => submitToFlow(row) },
+                { key: 'submit', onPositiveClick: () => submitToFlow(row) },
                 {
                   trigger: () => h(NButton, { size: 'tiny', text: true, type: 'info' }, { default: () => '提交' }),
                   default: () => `提交「${row.docNo}」进入审批？未绑定流程时会直接通过。`
@@ -314,14 +320,14 @@ const columns = computed<DataTableColumns<OrderRow>>(() => [
           hasPerm(`${kind.perm}:delete`) && editable(row)
             ? h(
                 NPopconfirm,
-                { onPositiveClick: () => remove(row) },
+                { key: 'delete', onPositiveClick: () => remove(row) },
                 {
                   trigger: () => h(NButton, { size: 'tiny', text: true, type: 'error' }, { default: () => '删除' }),
                   default: () => `删除「${row.docNo}」？明细一并软删。`
                 }
               )
             : null
-        ]
+        ].filter(Boolean)
       })
   }
 ])
@@ -465,7 +471,7 @@ onMounted(() => void loadOptions())
       <template #footer>
         <NSpace justify="end">
           <NButton @click="modalVisible = false">{{ readonly ? '关闭' : '取消' }}</NButton>
-          <NButton v-if="!readonly" type="primary" :loading="saving" @click="submit">保存</NButton>
+          <NButton v-if="!readonly" type="primary" :loading="saving" @click="saveAndClose">保存</NButton>
         </NSpace>
       </template>
     </NModal>

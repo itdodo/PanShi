@@ -37,7 +37,8 @@ public class MdMasterDataTests(PgFixture fx) : PgTestBase(fx)
         var materials = await Fx.Materials().PageAsync(new MaterialQuery { PageSize = 200 });
         var suppliers = await Fx.Suppliers().PageAsync(new SupplierQuery { PageSize = 200 });
         var customers = await Fx.Customers().PageAsync(new CustomerQuery { PageSize = 200 });
-        var warehouses = await Fx.Warehouses().PageAsync(new WarehouseQuery { PageSize = 50 });
+        // 只翻种子前缀的那几条：测试库是共享的，别处建的仓按 create_time 倒序会把演示数据挤出首页
+        var warehouses = await Fx.Warehouses().PageAsync(new WarehouseQuery { Keyword = "WH-", PageSize = 50 });
         Assert.True(materials.Total >= 12);
         Assert.True(suppliers.Total >= 6);
         Assert.True(customers.Total >= 6);
@@ -45,7 +46,7 @@ public class MdMasterDataTests(PgFixture fx) : PgTestBase(fx)
         // Warehouse_Keeps_At_Most_One_Default 就会抢，且不会归还）——所以这里断言服务真正
         // 保证的不变量「至多一个默认」，而不是「此刻恰好是种子的哪一个」，否则用例互相依赖执行顺序。
         Assert.Contains(warehouses.Rows, w => w.WarehouseCode == "WH-ZC");
-        Assert.True(warehouses.Rows.Count(w => w.IsDefault) <= 1);
+        Assert.True(await Db.Queryable<MdWarehouse>().Where(w => w.IsDefault).CountAsync() <= 1);
 
         // 演示数据要能真的支撑下单：供应商×物料能查到协议价，且带出税率
         var supplier = suppliers.Rows.First(r => r.SupplierCode == "SP-001");
