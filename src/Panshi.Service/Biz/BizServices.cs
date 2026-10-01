@@ -99,9 +99,20 @@ public class ExpenseService(
         }
         else
         {
-            doc.Status = BizDocStatus.Running;
             doc.InstanceId = instanceId;
-            await Repo.UpdateColumnsAsync(doc, "Status", "InstanceId");
+            // 实例可能这一次提交就走完了：终态由 OnFinishedAsync 写好，这里只补 InstanceId，
+            // 再写 Running 就把「已通过」盖成永远推不动的「审批中」
+            if (await engine.IsOpenAsync(instanceId))
+            {
+                doc.Status = BizDocStatus.Running;
+                await Repo.UpdateColumnsAsync(doc, "Status", "InstanceId");
+            }
+            else
+            {
+                await Repo.UpdateColumnsAsync(doc, "InstanceId");
+                // 终态是回调在引擎事务里写的，不重读就会给前端回一个「草稿」
+                doc = await Repo.GetAsync(id);
+            }
         }
 
         return ToDto(doc);
@@ -249,9 +260,28 @@ public class PurchaseService(
         payload.Variables["amount"] = doc.Amount;
         var instanceId = await engine.SubmitAsync(payload, userId, userName);
 
-        doc.Status = instanceId == -1 ? BizDocStatus.Approved : BizDocStatus.Running;
-        doc.InstanceId = instanceId == -1 ? null : instanceId;
-        await Repo.UpdateColumnsAsync(doc, "Status", "InstanceId");
+        if (instanceId == -1)
+        {
+            doc.Status = BizDocStatus.Approved;
+            doc.InstanceId = null;
+            await Repo.UpdateColumnsAsync(doc, "Status", "InstanceId");
+        }
+        else
+        {
+            doc.InstanceId = instanceId;
+            // 同上：实例已同步走完时，Status 归 OnFinishedAsync 写，这里盖不得
+            if (await engine.IsOpenAsync(instanceId))
+            {
+                doc.Status = BizDocStatus.Running;
+                await Repo.UpdateColumnsAsync(doc, "Status", "InstanceId");
+            }
+            else
+            {
+                await Repo.UpdateColumnsAsync(doc, "InstanceId");
+                // 终态是回调在引擎事务里写的，不重读就会给前端回一个「草稿」
+                doc = await Repo.GetAsync(id);
+            }
+        }
         return ToDto(doc);
     }
 

@@ -77,6 +77,13 @@ public class FlowEngineService(
         return instance.Id;
     }
 
+    /// <summary>
+    /// 实例是否仍在跑。提交这一次就可能直接走到终态（节点全自动通过、自选没选人、审批人全是发起人自己），
+    /// 业务侧据此决定要不要自己写 Status——已终态时终态是 OnFinishedAsync 落的，再写一遍就是覆盖。
+    /// </summary>
+    public Task<bool> IsOpenAsync(long instanceId)
+        => instanceRepo.ExistsAsync(i => i.Id == instanceId && i.Status == FlowInstanceStatus.Running);
+
     // ================= 审批动作 =================
     public async Task HandleAsync(long taskId, FlowActDto dto, long actorId, string actorName)
     {

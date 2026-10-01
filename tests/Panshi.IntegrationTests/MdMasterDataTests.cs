@@ -48,9 +48,12 @@ public class MdMasterDataTests(PgFixture fx) : PgTestBase(fx)
         Assert.Contains(warehouses.Rows, w => w.WarehouseCode == "WH-ZC");
         Assert.True(await Db.Queryable<MdWarehouse>().Where(w => w.IsDefault).CountAsync() <= 1);
 
-        // 演示数据要能真的支撑下单：供应商×物料能查到协议价，且带出税率
-        var supplier = suppliers.Rows.First(r => r.SupplierCode == "SP-001");
-        var material = materials.Rows.First(r => r.MaterialCode == "RM-ST01");
+        // 演示数据要能真的支撑下单：供应商×物料能查到协议价，且带出税率。
+        // 按编码精确搜而不是从首页翻——测试库是共享的，别处造的物料早已远超一页
+        var supplier = (await Fx.Suppliers().PageAsync(new SupplierQuery { Keyword = "SP-001", PageSize = 10 }))
+            .Rows.First(r => r.SupplierCode == "SP-001");
+        var material = (await Fx.Materials().PageAsync(new MaterialQuery { Keyword = "RM-ST01", PageSize = 10 }))
+            .Rows.First(r => r.MaterialCode == "RM-ST01");
         var quote = await Fx.Prices().QuoteAsync(long.Parse(supplier.Id), long.Parse(material.Id));
         Assert.NotNull(quote);
         Assert.Equal(4520.00m, quote.UnitPrice);

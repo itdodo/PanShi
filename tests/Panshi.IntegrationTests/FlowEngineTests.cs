@@ -152,6 +152,38 @@ public class FlowEngineTests(PgFixture fx) : PgTestBase(fx)
         Assert.True(await Db.Queryable<SysFlowRecord>().AnyAsync(r => r.InstanceId == autoId && r.Action == "auto"));
     }
 
+    /// <summary>
+    /// 走服务层入口（不是直调引擎）：流程在提交过程中就同步走完时，终态由 OnFinishedAsync 落库，
+    /// 服务层不能再把 Status 盖成 Running——盖了就是一张「实例已通过、单据卡审批中」的死单，
+    /// 既不能编辑（GuardEditable 拒 Running）也没有待办能推进它。
+    /// </summary>
+    [Fact]
+    public async Task Service_Submit_Keeps_Terminal_Status_When_Flow_Finishes_Synchronously()
+    {
+        var graph = """
+        {"nodes":[
+          {"code":"start","type":"start","next":"n1"},
+          {"code":"n1","type":"approval","name":"审批","mode":"orSign","next":"end","approvers":[{"type":"role","roleCodes":["no_such_role_sync"]}]},
+          {"code":"end","type":"end"}],"entry":"start"}
+        """;
+        var (_, code) = await CreateAndEnableAsync(graph);
+        await BindAsync("biz_expense", code);
+        using var _ = As(1, "admin", 2);
+        var exp = await NewExpenseAsync(70, 1, "admin", 2);
+
+        var dto = await Fx.Expenses().SubmitAsync(exp.Id, 1, "admin", new FlowSubmitDto
+        {
+            BusinessTable = "biz_expense", BusinessId = exp.Id,
+            Variables = new Dictionary<string, object> { ["amount"] = 70 }
+        });
+
+        Assert.NotNull(dto.InstanceId);
+        Assert.Equal(FlowInstanceStatus.Approved,
+            (await Db.Queryable<SysFlowInstance>().InSingleAsync(long.Parse(dto.InstanceId!))).Status);
+        Assert.Equal(BizDocStatus.Approved, dto.Status);
+        Assert.Equal(BizDocStatus.Approved, (await Db.Queryable<BizExpense>().InSingleAsync(exp.Id)).Status);
+    }
+
     [Fact]
     public async Task Pending_Then_Approve_Completes()
     {

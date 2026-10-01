@@ -189,9 +189,28 @@ public class PurchaseOrderService(
         payload.Variables["supplierId"] = doc.SupplierId;
         var instanceId = await engine.SubmitAsync(payload, userId, userName);
 
-        doc.Status = instanceId == -1 ? BizDocStatus.Approved : BizDocStatus.Running;
-        doc.InstanceId = instanceId == -1 ? null : instanceId;
-        await Repo.UpdateColumnsAsync(doc, "Status", "InstanceId");
+        if (instanceId == -1)
+        {
+            doc.Status = BizDocStatus.Approved;
+            doc.InstanceId = null;
+            await Repo.UpdateColumnsAsync(doc, "Status", "InstanceId");
+        }
+        else
+        {
+            doc.InstanceId = instanceId;
+            // 实例可能这一次提交就走完了：终态归 OnFinishedAsync 写，这里再写 Running 就是盖成死单
+            if (await engine.IsOpenAsync(instanceId))
+            {
+                doc.Status = BizDocStatus.Running;
+                await Repo.UpdateColumnsAsync(doc, "Status", "InstanceId");
+            }
+            else
+            {
+                await Repo.UpdateColumnsAsync(doc, "InstanceId");
+                // 终态是回调在引擎事务里写的，不重读就会给前端回一个「草稿」
+                doc = await Repo.GetAsync(id);
+            }
+        }
         return ToDto(doc);
     }
 
@@ -400,9 +419,28 @@ public class SalesOrderService(
         payload.Variables["customerId"] = doc.CustomerId;
         var instanceId = await engine.SubmitAsync(payload, userId, userName);
 
-        doc.Status = instanceId == -1 ? BizDocStatus.Approved : BizDocStatus.Running;
-        doc.InstanceId = instanceId == -1 ? null : instanceId;
-        await Repo.UpdateColumnsAsync(doc, "Status", "InstanceId");
+        if (instanceId == -1)
+        {
+            doc.Status = BizDocStatus.Approved;
+            doc.InstanceId = null;
+            await Repo.UpdateColumnsAsync(doc, "Status", "InstanceId");
+        }
+        else
+        {
+            doc.InstanceId = instanceId;
+            // 实例可能这一次提交就走完了：终态归 OnFinishedAsync 写，这里再写 Running 就是盖成死单
+            if (await engine.IsOpenAsync(instanceId))
+            {
+                doc.Status = BizDocStatus.Running;
+                await Repo.UpdateColumnsAsync(doc, "Status", "InstanceId");
+            }
+            else
+            {
+                await Repo.UpdateColumnsAsync(doc, "InstanceId");
+                // 终态是回调在引擎事务里写的，不重读就会给前端回一个「草稿」
+                doc = await Repo.GetAsync(id);
+            }
+        }
         return ToDto(doc);
     }
 
