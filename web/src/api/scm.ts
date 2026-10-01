@@ -110,12 +110,12 @@ export interface SalesOrderForm {
   version?: number
 }
 
-/** 提交审批：businessTable/businessId 后端会覆盖，这里按引擎入参形状带上 */
-const submitPayload = (id: string) => ({
+/** 提交审批：businessTable/businessId/variables 后端会覆盖或补齐，choiceUserIds 供「发起人自选」节点 */
+const submitPayload = (id: string, choiceUserIds?: string[]) => ({
   businessTable: '',
   businessId: Number(id),
   variables: {},
-  choiceUserIds: []
+  choiceUserIds: choiceUserIds ?? []
 })
 
 export const pagePurchaseOrders = (q: ScmDocQuery) => get<PagedResult<PurchaseOrderDto>>('/scm/purchase-order/page', q)
@@ -124,16 +124,22 @@ export const createPurchaseOrder = (d: PurchaseOrderForm) => post<PurchaseOrderD
 export const updatePurchaseOrder = (id: string, d: PurchaseOrderForm) =>
   put<VoidResult>(`/scm/purchase-order/${id}`, d)
 export const deletePurchaseOrder = (id: string) => del<VoidResult>(`/scm/purchase-order/${id}`)
-export const submitPurchaseOrder = (id: string) =>
-  post<PurchaseOrderDto>(`/scm/purchase-order/${id}/submit`, { ...submitPayload(id), businessTable: 'scm_purchase_order' })
+export const submitPurchaseOrder = (id: string, choiceUserIds?: string[]) =>
+  post<PurchaseOrderDto>(`/scm/purchase-order/${id}/submit`, {
+    ...submitPayload(id, choiceUserIds),
+    businessTable: 'scm_purchase_order'
+  })
 
 export const pageSalesOrders = (q: ScmDocQuery) => get<PagedResult<SalesOrderDto>>('/scm/sales-order/page', q)
 export const getSalesOrder = (id: string) => get<SalesOrderDto>(`/scm/sales-order/${id}`)
 export const createSalesOrder = (d: SalesOrderForm) => post<SalesOrderDto>('/scm/sales-order', d)
 export const updateSalesOrder = (id: string, d: SalesOrderForm) => put<VoidResult>(`/scm/sales-order/${id}`, d)
 export const deleteSalesOrder = (id: string) => del<VoidResult>(`/scm/sales-order/${id}`)
-export const submitSalesOrder = (id: string) =>
-  post<SalesOrderDto>(`/scm/sales-order/${id}/submit`, { ...submitPayload(id), businessTable: 'scm_sales_order' })
+export const submitSalesOrder = (id: string, choiceUserIds?: string[]) =>
+  post<SalesOrderDto>(`/scm/sales-order/${id}/submit`, {
+    ...submitPayload(id, choiceUserIds),
+    businessTable: 'scm_sales_order'
+  })
 
 /** 行金额口径与后端一致：数量×单价，四舍五入到分（half-up） */
 export function lineAmount(qty: number, price: number): number {

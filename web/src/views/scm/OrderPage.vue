@@ -23,9 +23,11 @@ import {
   type SelectOption
 } from 'naive-ui'
 import { DOC_STATUS } from '@/api/biz'
+import { userOptions } from '@/api/admin'
 import { pageMaterials } from '@/api/basedata'
 import type { MaterialChoice, OrderLineForm } from '@/api/scm'
 import { docStatusMeta } from '@/components/flowEnums'
+import { probeSubmitterChoice } from '@/components/flowChoice'
 import OrderLinesEditor from '@/components/OrderLinesEditor.vue'
 import { usePageList } from '@/composables/usePageList'
 import { hasPerm } from '@/directives/permission'
@@ -238,13 +240,54 @@ async function remove(row: OrderRow): Promise<void> {
   }
 }
 
-async function submitToFlow(row: OrderRow): Promise<void> {
+/* ----------------------------- 提交审批（发起人自选） ----------------------------- */
+const showChoice = ref(false)
+const submitting = ref(false)
+const choiceRequired = ref(false)
+const choiceUsers = ref<string[]>([])
+const choiceDocId = ref('')
+const choiceDocNo = ref('')
+const userOpts = ref<SelectOption[]>([])
+
+/**
+ * 提交前先探绑定流程里有没有「发起人自选」节点：没有就直接提交，有就必须选人。
+ * 漏传不会报错——引擎按「审批人为空」自动通过，等于把那个人工节点静默跳过，所以宁可拦下来。
+ */
+async function openSubmit(row: OrderRow): Promise<void> {
+  choiceDocId.value = row.id
+  choiceDocNo.value = row.docNo
+  choiceUsers.value = []
+  const need = await probeSubmitterChoice(kind.businessTable)
+  choiceRequired.value = need === 'yes'
+  if (need === 'no') {
+    await doSubmit()
+    return
+  }
+  showChoice.value = true
+  if (!userOpts.value.length) {
+    try {
+      userOpts.value = (await userOptions()).map((o) => ({ label: o.label, value: o.value }))
+    } catch {
+      userOpts.value = []
+    }
+  }
+}
+
+async function doSubmit(): Promise<void> {
+  if (choiceRequired.value && !choiceUsers.value.length) {
+    message.warning('该流程含发起人自选节点，请至少选择一位审批人')
+    return
+  }
+  submitting.value = true
   try {
-    const result = await kind.submit(row.id)
+    const result = await kind.submit(choiceDocId.value, choiceUsers.value)
     message.success(result.status === DOC_STATUS.Approved ? '已提交（该单据未绑定审批流，直通通过）' : '已提交审批')
+    showChoice.value = false
     await list.load()
   } catch {
     /* 已提示 */
+  } finally {
+    submitting.value = false
   }
 }
 
@@ -309,12 +352,9 @@ const columns = computed<DataTableColumns<OrderRow>>(() => [
             : h(NButton, { key: 'view', size: 'tiny', text: true, onClick: () => openRow(row, 'view') }, { default: () => '查看' }),
           hasPerm(`${kind.perm}:submit`) && editable(row)
             ? h(
-                NPopconfirm,
-                { key: 'submit', onPositiveClick: () => submitToFlow(row) },
-                {
-                  trigger: () => h(NButton, { size: 'tiny', text: true, type: 'info' }, { default: () => '提交' }),
-                  default: () => `提交「${row.docNo}」进入审批？未绑定流程时会直接通过。`
-                }
+                NButton,
+                { key: 'submit', size: 'tiny', text: true, type: 'info', onClick: () => openSubmit(row) },
+                { default: () => '提交' }
               )
             : null,
           hasPerm(`${kind.perm}:delete`) && editable(row)
@@ -472,6 +512,41 @@ onMounted(() => void loadOptions())
         <NSpace justify="end">
           <NButton @click="modalVisible = false">{{ readonly ? '关闭' : '取消' }}</NButton>
           <NButton v-if="!readonly" type="primary" :loading="saving" @click="saveAndClose">保存</NButton>
+        </NSpace>
+      </template>
+    </NModal>
+
+    <!-- 提交审批：绑定流程含「发起人自选」节点时在这里选人 -->
+    <NModal
+      v-model:show="showChoice"
+      preset="card"
+      :title="`提交审批 ${choiceDocNo}`"
+      :style="{ width: '480px' }"
+      :mask-closable="false"
+    >
+      <NForm label-placement="left" label-width="86">
+        <NFormItem label="自选审批人" :required="choiceRequired">
+          <NSelect
+            v-model:value="choiceUsers"
+            :options="userOpts"
+            multiple
+            filterable
+            clearable
+            placeholder="该流程含「发起人自选」节点"
+          />
+        </NFormItem>
+        <p class="ps-muted">
+          {{
+            choiceRequired
+              ? '该流程包含发起人自选审批节点，至少选择一位；条件分支会按金额自动判定。'
+              : '若该流程含发起人自选节点请在此选人，否则可直接提交（不确定时可留空）。'
+          }}
+        </p>
+      </NForm>
+      <template #footer>
+        <NSpace justify="end">
+          <NButton @click="showChoice = false">取消</NButton>
+          <NButton type="primary" :loading="submitting" @click="doSubmit">确认提交</NButton>
         </NSpace>
       </template>
     </NModal>

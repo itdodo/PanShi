@@ -38,15 +38,8 @@ import {
   type FileDto,
   type PurchaseDto
 } from '@/api/biz'
-import {
-  instanceDetail,
-  type FlowBindingDto,
-  type FlowDefDto,
-  type FlowInstanceDetail
-} from '@/api/flow'
+import { instanceDetail, type FlowInstanceDetail } from '@/api/flow'
 import { userOptions } from '@/api/admin'
-import { get } from '@/api/http'
-import type { PagedResult } from '@/api/types'
 import { usePageList } from '@/composables/usePageList'
 import { useNoticeStore } from '@/stores/notice'
 import { formatDateTime } from '@/utils/format'
@@ -55,7 +48,7 @@ import { hasPerm } from '@/directives/permission'
 import FlowTimeline from '@/components/FlowTimeline.vue'
 import BizDocPreview from '@/components/BizDocPreview.vue'
 import { docStatusMeta } from '@/components/flowEnums'
-import { hasSubmitterChoice, parseGraph } from '@/components/flowGraph'
+import { probeSubmitterChoice } from '@/components/flowChoice'
 
 /** 采购申请单：与报销单同构（品名/数量/预算金额/事由），提交走绑定流程。 */
 const route = useRoute()
@@ -208,32 +201,10 @@ const choiceUsers = ref<string[]>([])
 const choiceDocId = ref('')
 const userOpts = ref<SelectOption[]>([])
 
-/**
- * 探测绑定流程是否含「发起人自选」节点（silent 原生请求，无 workflow 权限时返回 unknown，
- * 退化为「可选选人」而不是报错）。
- */
-async function probeChoice(): Promise<'yes' | 'no' | 'unknown'> {
-  try {
-    const bindings = await get<FlowBindingDto[]>('/sys/flow/binding', undefined, { silent: true })
-    const binding = (bindings ?? []).find((b) => b.businessTable === 'biz_purchase_request' && b.status === 1)
-    if (!binding) return 'no'
-    const page = await get<PagedResult<FlowDefDto>>(
-      '/sys/flow/def/page',
-      { pageNum: 1, pageSize: 200, status: 1, keyword: binding.flowCode },
-      { silent: true }
-    )
-    const def = (page?.rows ?? []).find((d) => d.flowCode === binding.flowCode && d.status === 1)
-    if (!def) return 'unknown'
-    return hasSubmitterChoice(parseGraph(def.nodeJson)) ? 'yes' : 'no'
-  } catch {
-    return 'unknown'
-  }
-}
-
 async function openSubmit(row: PurchaseDto): Promise<void> {
   choiceDocId.value = row.id
   choiceUsers.value = []
-  const need = await probeChoice()
+  const need = await probeSubmitterChoice('biz_purchase_request')
   choiceRequired.value = need === 'yes'
   if (need === 'no') {
     await doSubmit()

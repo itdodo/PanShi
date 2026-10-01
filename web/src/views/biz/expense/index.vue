@@ -38,15 +38,8 @@ import {
   type ExpenseDto,
   type FileDto
 } from '@/api/biz'
-import {
-  instanceDetail,
-  type FlowBindingDto,
-  type FlowDefDto,
-  type FlowInstanceDetail
-} from '@/api/flow'
+import { instanceDetail, type FlowInstanceDetail } from '@/api/flow'
 import { userOptions } from '@/api/admin'
-import { get } from '@/api/http'
-import type { PagedResult } from '@/api/types'
 import { usePageList } from '@/composables/usePageList'
 import { useNoticeStore } from '@/stores/notice'
 import { formatDateTime } from '@/utils/format'
@@ -56,7 +49,7 @@ import FlowTimeline from '@/components/FlowTimeline.vue'
 import BizDocPreview from '@/components/BizDocPreview.vue'
 import { docStatusMeta } from '@/components/flowEnums'
 import { categoryLabel, loadExpenseCategories, type CategoryOption } from '@/components/bizDict'
-import { hasSubmitterChoice, parseGraph } from '@/components/flowGraph'
+import { probeSubmitterChoice } from '@/components/flowChoice'
 
 /**
  * 报销单：草稿可改可删，提交走绑定流程（含 submitterChoice 节点时先弹选人）。
@@ -208,33 +201,10 @@ const choiceUsers = ref<string[]>([])
 const choiceDocId = ref('')
 const userOpts = ref<SelectOption[]>([])
 
-/**
- * 探测绑定流程是否含「发起人自选」节点。
- * 走 silent 原生请求：普通提交人通常没有 workflow:def:list / workflow:binding:list 权限，
- * 探测不到时返回 unknown → 弹「可选选人」而不是报错。
- */
-async function probeChoice(): Promise<'yes' | 'no' | 'unknown'> {
-  try {
-    const bindings = await get<FlowBindingDto[]>('/sys/flow/binding', undefined, { silent: true })
-    const binding = (bindings ?? []).find((b) => b.businessTable === 'biz_expense' && b.status === 1)
-    if (!binding) return 'no'
-    const page = await get<PagedResult<FlowDefDto>>(
-      '/sys/flow/def/page',
-      { pageNum: 1, pageSize: 200, status: 1, keyword: binding.flowCode },
-      { silent: true }
-    )
-    const def = (page?.rows ?? []).find((d) => d.flowCode === binding.flowCode && d.status === 1)
-    if (!def) return 'unknown'
-    return hasSubmitterChoice(parseGraph(def.nodeJson)) ? 'yes' : 'no'
-  } catch {
-    return 'unknown'
-  }
-}
-
 async function openSubmit(row: ExpenseDto): Promise<void> {
   choiceDocId.value = row.id
   choiceUsers.value = []
-  const need = await probeChoice()
+  const need = await probeSubmitterChoice('biz_expense')
   choiceRequired.value = need === 'yes'
   if (need === 'no') {
     await doSubmit()

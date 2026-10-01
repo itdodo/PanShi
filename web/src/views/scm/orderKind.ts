@@ -70,6 +70,8 @@ export interface OrderKind {
   title: string
   /** 权限码前缀，如 scm:purchase */
   perm: string
+  /** 流程绑定用的业务表名（探测「发起人自选」节点要按它反查） */
+  businessTable: string
   partnerLabel: string
   /** 列表查询里往来单位的参数名（supplierId / customerId） */
   partnerFieldName: 'supplierId' | 'customerId'
@@ -88,7 +90,8 @@ export interface OrderKind {
   create: (d: OrderFormModel) => Promise<OrderRow>
   update: (id: string, d: OrderFormModel) => Promise<VoidResult>
   remove: (id: string) => Promise<VoidResult>
-  submit: (id: string) => Promise<OrderRow>
+  /** choiceUserIds 供流程里的「发起人自选」节点，没有该节点时传空即可 */
+  submit: (id: string, choiceUserIds?: string[]) => Promise<OrderRow>
 }
 
 /** 已通过的采购申请单（status=2）才是合法来源 */
@@ -100,6 +103,7 @@ const sourceRequestOptions = async (): Promise<Option[]> => {
 export const purchaseKind: OrderKind = {
   title: '采购订单',
   perm: 'scm:purchase',
+  businessTable: 'scm_purchase_order',
   partnerLabel: '供应商',
   partnerFieldName: 'supplierId',
   extraLabel: '来源申请单',
@@ -143,6 +147,7 @@ export const purchaseKind: OrderKind = {
 export const salesKind: OrderKind = {
   title: '销售订单',
   perm: 'scm:sales',
+  businessTable: 'scm_sales_order',
   partnerLabel: '客户',
   partnerFieldName: 'customerId',
   extraLabel: '发货仓库',

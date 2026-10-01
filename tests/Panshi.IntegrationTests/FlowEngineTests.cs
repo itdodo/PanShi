@@ -116,6 +116,43 @@ public class FlowEngineTests(PgFixture fx) : PgTestBase(fx)
     }
 
     [Fact]
+    public async Task SubmitterChoice_Needs_ChoiceUserIds_Otherwise_AutoPasses()
+    {
+        // 自选节点：带人=真生成待办；不带人=解析为空→自动通过。
+        // 漏传不会报错，只会把人工审批静默跳过，所以前端提交前的必选弹窗要有这条语义兜着。
+        var graph = """
+        {"nodes":[
+          {"code":"start","type":"start","next":"n1"},
+          {"code":"n1","type":"approval","name":"自选","mode":"orSign","next":"end","approvers":[{"type":"submitterChoice"}]},
+          {"code":"end","type":"end"}],"entry":"start"}
+        """;
+        var (_, code) = await CreateAndEnableAsync(graph);
+        await BindAsync("biz_expense", code);
+        using var _ = As(1, "admin", 2);
+        var chosen = await EnsureUserAsync("t_flow_choice", 3);
+
+        var instId = await Fx.Engine().SubmitAsync(new FlowSubmitDto
+        {
+            BusinessTable = "biz_expense", BusinessId = (await NewExpenseAsync(30, 1, "admin", 2)).Id,
+            Variables = new Dictionary<string, object> { ["amount"] = 30 },
+            ChoiceUserIds = [chosen.Id.ToString()]
+        }, 1, "admin");
+        var task = (await Db.Queryable<SysFlowTask>().Where(t => t.InstanceId == instId).ToListAsync()).Single();
+        Assert.Equal(chosen.Id, task.ApproverUserId);
+        Assert.Equal(FlowTaskStatus.Pending, task.Status);
+        Assert.Equal(FlowInstanceStatus.Running, (await Db.Queryable<SysFlowInstance>().InSingleAsync(instId)).Status);
+
+        var noChoice = await NewExpenseAsync(30, 1, "admin", 2);
+        var autoId = await Fx.Engine().SubmitAsync(new FlowSubmitDto
+        {
+            BusinessTable = "biz_expense", BusinessId = noChoice.Id,
+            Variables = new Dictionary<string, object> { ["amount"] = 30 }
+        }, 1, "admin");
+        Assert.Equal(FlowInstanceStatus.Approved, (await Db.Queryable<SysFlowInstance>().InSingleAsync(autoId)).Status);
+        Assert.True(await Db.Queryable<SysFlowRecord>().AnyAsync(r => r.InstanceId == autoId && r.Action == "auto"));
+    }
+
+    [Fact]
     public async Task Pending_Then_Approve_Completes()
     {
         var wang = await EnsureUserAsync("t_flow_wang", 3); // 审批人=王五，发起人=admin
