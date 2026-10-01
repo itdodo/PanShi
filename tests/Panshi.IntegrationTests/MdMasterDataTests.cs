@@ -30,6 +30,37 @@ public class MdMasterDataTests(PgFixture fx) : PgTestBase(fx)
     };
 
     [Fact]
+    public async Task Seeded_Demo_Data_Is_Present_And_Quote_Resolves()
+    {
+        // 迁移 0006 灌的演示数据：物料 12 / 供应商 6 / 客户 6 / 仓库 3（1 默认）/ 协议价 10。
+        // 断言用「至少」而不是精确值——用户在自己库里加料不该把测试弄红。
+        var materials = await Fx.Materials().PageAsync(new MaterialQuery { PageSize = 200 });
+        var suppliers = await Fx.Suppliers().PageAsync(new SupplierQuery { PageSize = 200 });
+        var customers = await Fx.Customers().PageAsync(new CustomerQuery { PageSize = 200 });
+        var warehouses = await Fx.Warehouses().PageAsync(new WarehouseQuery { PageSize = 50 });
+        Assert.True(materials.Total >= 12);
+        Assert.True(suppliers.Total >= 6);
+        Assert.True(customers.Total >= 6);
+        // 种子确实把 WH-ZC 设成默认仓，但「默认」是可被别的仓抢走的（ScmOrderTests 的
+        // Warehouse_Keeps_At_Most_One_Default 就会抢，且不会归还）——所以这里断言服务真正
+        // 保证的不变量「至多一个默认」，而不是「此刻恰好是种子的哪一个」，否则用例互相依赖执行顺序。
+        Assert.Contains(warehouses.Rows, w => w.WarehouseCode == "WH-ZC");
+        Assert.True(warehouses.Rows.Count(w => w.IsDefault) <= 1);
+
+        // 演示数据要能真的支撑下单：供应商×物料能查到协议价，且带出税率
+        var supplier = suppliers.Rows.First(r => r.SupplierCode == "SP-001");
+        var material = materials.Rows.First(r => r.MaterialCode == "RM-ST01");
+        var quote = await Fx.Prices().QuoteAsync(long.Parse(supplier.Id), long.Parse(material.Id));
+        Assert.NotNull(quote);
+        Assert.Equal(4520.00m, quote.UnitPrice);
+        Assert.Equal(13m, quote.TaxRate);
+
+        // 启用的主数据都进得了下拉
+        Assert.NotEmpty(await Fx.Materials().OptionsAsync());
+        Assert.NotEmpty(await Fx.Warehouses().OptionsAsync());
+    }
+
+    [Fact]
     public async Task Material_Code_Is_Unique_And_Reusable_After_Soft_Delete()
     {
         var code = Code("M");
