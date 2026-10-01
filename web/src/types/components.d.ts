@@ -40,6 +40,7 @@ declare module 'vue' {
     NDataTable: typeof import('naive-ui')['NDataTable']
     NSelect: typeof import('naive-ui')['NSelect']
     NTag: typeof import('naive-ui')['NTag']
+    OrderLinesEditor: typeof import('./../components/OrderLinesEditor.vue')['default']
     RichTextEditor: typeof import('./../components/RichTextEditor.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']

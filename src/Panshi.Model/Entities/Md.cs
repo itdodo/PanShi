@@ -127,3 +127,79 @@ public class MdCustomer : BaseEntity
     [SugarColumn(IsNullable = true, Length = 512)]
     public string? Remark { get; set; }
 }
+
+/// <summary>
+/// 仓库主数据。出入库单要选仓库，所以它属于基础资料而非供应链单据；
+/// 全库只允许一个 IsDefault（服务层互斥维护），单据新建时默认带出。
+/// </summary>
+[SugarTable("md_warehouse")]
+public class MdWarehouse : BaseEntity
+{
+    [SugarColumn(Length = 32)]
+    public string WarehouseCode { get; set; } = "";
+
+    [SugarColumn(Length = 128)]
+    public string WarehouseName { get; set; } = "";
+
+    [SugarColumn(IsNullable = true, Length = 256)]
+    public string? Address { get; set; }
+
+    [SugarColumn(IsNullable = true, Length = 32)]
+    public string? Contact { get; set; }
+
+    [SugarColumn(IsNullable = true, Length = 32)]
+    public string? Phone { get; set; }
+
+    /// <summary>默认仓（新建单据不带仓库参数时用它；全库至多一个）</summary>
+    public bool IsDefault { get; set; }
+
+    public EnableStatus Status { get; set; } = EnableStatus.Enabled;
+
+    [SugarColumn(IsNullable = true, Length = 512)]
+    public string? Remark { get; set; }
+}
+
+/// <summary>
+/// 采购协议价：一个供应商 × 一个物料只留一行现行价（软删过滤下唯一）。
+/// 调价直接改这行，历史靠字段级变更日志（sys_change_log）回溯，不在业务表里堆版本行。
+/// </summary>
+[SugarTable("md_price_agreement")]
+public class MdPriceAgreement : BaseEntity
+{
+    [SugarColumn(ColumnDataType = "bigint")]
+    public long SupplierId { get; set; }
+
+    /// <summary>供应商名称快照：主数据改名不该改写历史报价的含义</summary>
+    [SugarColumn(Length = 128)]
+    public string SupplierName { get; set; } = "";
+
+    [SugarColumn(ColumnDataType = "bigint")]
+    public long MaterialId { get; set; }
+
+    [SugarColumn(Length = 32)]
+    public string MaterialCode { get; set; } = "";
+
+    [SugarColumn(Length = 128)]
+    public string MaterialName { get; set; } = "";
+
+    /// <summary>含税单价（下单选料时按此带出价格）</summary>
+    [SugarColumn(ColumnDataType = "numeric(18,4)")]
+    public decimal UnitPrice { get; set; }
+
+    /// <summary>税率百分比，如 13 表示 13%</summary>
+    [SugarColumn(ColumnDataType = "numeric(5,2)")]
+    public decimal TaxRate { get; set; }
+
+    /// <summary>生效起始日；null = 立即生效</summary>
+    [SugarColumn(IsNullable = true)]
+    public DateTime? BeginDate { get; set; }
+
+    /// <summary>失效日；null = 长期有效</summary>
+    [SugarColumn(IsNullable = true)]
+    public DateTime? EndDate { get; set; }
+
+    public EnableStatus Status { get; set; } = EnableStatus.Enabled;
+
+    [SugarColumn(IsNullable = true, Length = 512)]
+    public string? Remark { get; set; }
+}

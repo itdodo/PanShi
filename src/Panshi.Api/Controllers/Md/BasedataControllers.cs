@@ -91,3 +91,58 @@ public class CustomerController(CustomerService customers) : ApiControllerBase
     [HasPermission("basedata:customer:delete")]
     public async Task Delete(long id) => await customers.DeleteAsync(id);
 }
+
+/// <summary>仓库管理（基础资料）。出入库单与发货仓库选择的数据源。</summary>
+[ApiController]
+[Authorize]
+[Route("api/v1/md/warehouse")]
+[Tags("基础资料-仓库")]
+public class WarehouseController(WarehouseService warehouses) : ApiControllerBase
+{
+    [HttpGet("page")]
+    [HasPermission("basedata:warehouse:list")]
+    public async Task<PagedResult<WarehouseDto>> Page([FromQuery] WarehouseQuery query) => await warehouses.PageAsync(query);
+
+    [HttpGet("options")]
+    public async Task<List<OptionDto>> Options() => await warehouses.OptionsAsync();
+
+    [HttpPost]
+    [HasPermission("basedata:warehouse:add")]
+    public async Task<WarehouseDto> Create([FromBody] WarehouseSaveDto dto) => await warehouses.CreateAsync(dto);
+
+    [HttpPut("{id:long}")]
+    [HasPermission("basedata:warehouse:edit")]
+    public async Task Update(long id, [FromBody] WarehouseSaveDto dto) => await warehouses.UpdateAsync(id, dto);
+
+    [HttpDelete("{id:long}")]
+    [HasPermission("basedata:warehouse:delete")]
+    public async Task Delete(long id) => await warehouses.DeleteAsync(id);
+}
+
+/// <summary>采购协议价（基础资料）。quote 端点给订单页选料后带价，登录即可。</summary>
+[ApiController]
+[Authorize]
+[Route("api/v1/md/price-agreement")]
+[Tags("基础资料-协议价")]
+public class PriceAgreementController(PriceAgreementService prices) : ApiControllerBase
+{
+    [HttpGet("page")]
+    [HasPermission("basedata:price:list")]
+    public async Task<PagedResult<PriceAgreementDto>> Page([FromQuery] PriceAgreementQuery query) => await prices.PageAsync(query);
+
+    [HttpGet("quote")]
+    public async Task<PriceAgreementDto?> Quote([FromQuery] long supplierId, [FromQuery] long materialId)
+        => await prices.QuoteAsync(supplierId, materialId);
+
+    [HttpPost]
+    [HasPermission("basedata:price:add")]
+    public async Task<PriceAgreementDto> Create([FromBody] PriceAgreementSaveDto dto) => await prices.CreateAsync(dto);
+
+    [HttpPut("{id:long}")]
+    [HasPermission("basedata:price:edit")]
+    public async Task Update(long id, [FromBody] PriceAgreementSaveDto dto) => await prices.UpdateAsync(id, dto);
+
+    [HttpDelete("{id:long}")]
+    [HasPermission("basedata:price:delete")]
+    public async Task Delete(long id) => await prices.DeleteAsync(id);
+}

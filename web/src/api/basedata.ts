@@ -138,3 +138,80 @@ export const MD_DICT = {
   supplierCategory: 'md_supplier_category',
   customerLevel: 'md_customer_level'
 } as const
+
+/** 仓库（/md/warehouse）：出入库与发货仓库的数据源，默认仓全库至多一个 */
+export interface WarehouseDto {
+  id: string
+  warehouseCode: string
+  warehouseName: string
+  address?: string | null
+  contact?: string | null
+  phone?: string | null
+  isDefault: boolean
+  status: number
+  remark?: string | null
+  createTime: string
+  version: number
+}
+export interface WarehouseForm {
+  warehouseCode: string
+  warehouseName: string
+  address?: string | null
+  contact?: string | null
+  phone?: string | null
+  isDefault: boolean
+  status: number
+  remark?: string | null
+  version?: number
+}
+export interface WarehouseQuery extends PageQuery {
+  keyword?: string
+  status?: number | null
+}
+export const pageWarehouses = (q: WarehouseQuery) => get<PagedResult<WarehouseDto>>('/md/warehouse/page', q)
+export const warehouseOptions = () => get<{ value: string; label: string }[]>('/md/warehouse/options')
+export const createWarehouse = (d: WarehouseForm) => post<WarehouseDto>('/md/warehouse', d)
+export const updateWarehouse = (id: string, d: WarehouseForm) => put<VoidResult>(`/md/warehouse/${id}`, d)
+export const deleteWarehouse = (id: string) => del<VoidResult>(`/md/warehouse/${id}`)
+
+/** 采购协议价（/md/price-agreement）：供应商×物料唯一，下单选料时带出价格 */
+export interface PriceAgreementDto {
+  id: string
+  supplierId: string
+  supplierName: string
+  materialId: string
+  materialCode: string
+  materialName: string
+  unitPrice: number
+  taxRate: number
+  beginDate?: string | null
+  endDate?: string | null
+  status: number
+  remark?: string | null
+  createTime: string
+  version: number
+}
+export interface PriceAgreementForm {
+  supplierId: string
+  materialId: string
+  unitPrice: number
+  taxRate: number
+  beginDate?: string | null
+  endDate?: string | null
+  status: number
+  remark?: string | null
+  version?: number
+}
+export interface PriceAgreementQuery extends PageQuery {
+  supplierId?: string | null
+  keyword?: string
+  status?: number | null
+}
+export const pagePriceAgreements = (q: PriceAgreementQuery) =>
+  get<PagedResult<PriceAgreementDto>>('/md/price-agreement/page', q)
+export const priceQuote = (supplierId: string, materialId: string) =>
+  get<PriceAgreementDto | null>('/md/price-agreement/quote', { supplierId, materialId }, { silent: true })
+export const createPriceAgreement = (d: PriceAgreementForm) => post<PriceAgreementDto>('/md/price-agreement', d)
+export const updatePriceAgreement = (id: string, d: PriceAgreementForm) =>
+  put<VoidResult>(`/md/price-agreement/${id}`, d)
+export const deletePriceAgreement = (id: string) => del<VoidResult>(`/md/price-agreement/${id}`)

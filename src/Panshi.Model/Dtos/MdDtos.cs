@@ -238,3 +238,128 @@ public class CustomerQuery : PagedQuery
 
     public EnableStatus? Status { get; set; }
 }
+
+public class WarehouseDto
+{
+    public string Id { get; set; } = "";
+
+    public string WarehouseCode { get; set; } = "";
+
+    public string WarehouseName { get; set; } = "";
+
+    public string? Address { get; set; }
+
+    public string? Contact { get; set; }
+
+    public string? Phone { get; set; }
+
+    public bool IsDefault { get; set; }
+
+    public EnableStatus Status { get; set; }
+
+    public string? Remark { get; set; }
+
+    public DateTime CreateTime { get; set; }
+
+    public int Version { get; set; }
+}
+
+public class WarehouseSaveDto
+{
+    [Required, StringLength(32, MinimumLength = 2)]
+    public string WarehouseCode { get; set; } = "";
+
+    [Required, StringLength(128)]
+    public string WarehouseName { get; set; } = "";
+
+    [StringLength(256)]
+    public string? Address { get; set; }
+
+    [StringLength(32)]
+    public string? Contact { get; set; }
+
+    [StringLength(32)]
+    public string? Phone { get; set; }
+
+    public bool IsDefault { get; set; }
+
+    public EnableStatus Status { get; set; } = EnableStatus.Enabled;
+
+    [StringLength(512)]
+    public string? Remark { get; set; }
+
+    public int Version { get; set; }
+}
+
+public class WarehouseQuery : PagedQuery
+{
+    public string? Keyword { get; set; }
+
+    public EnableStatus? Status { get; set; }
+}
+
+public class PriceAgreementDto
+{
+    public string Id { get; set; } = "";
+
+    public string SupplierId { get; set; } = "";
+
+    public string SupplierName { get; set; } = "";
+
+    public string MaterialId { get; set; } = "";
+
+    public string MaterialCode { get; set; } = "";
+
+    public string MaterialName { get; set; } = "";
+
+    public decimal UnitPrice { get; set; }
+
+    public decimal TaxRate { get; set; }
+
+    public DateTime? BeginDate { get; set; }
+
+    public DateTime? EndDate { get; set; }
+
+    public EnableStatus Status { get; set; }
+
+    public string? Remark { get; set; }
+
+    public DateTime CreateTime { get; set; }
+
+    public int Version { get; set; }
+}
+
+public class PriceAgreementSaveDto
+{
+    [Required]
+    public string SupplierId { get; set; } = "";
+
+    [Required]
+    public string MaterialId { get; set; } = "";
+
+    [Range(typeof(decimal), "0", "99999999999999")]
+    public decimal UnitPrice { get; set; }
+
+    [Range(typeof(decimal), "0", "100")]
+    public decimal TaxRate { get; set; }
+
+    public DateTime? BeginDate { get; set; }
+
+    public DateTime? EndDate { get; set; }
+
+    public EnableStatus Status { get; set; } = EnableStatus.Enabled;
+
+    [StringLength(512)]
+    public string? Remark { get; set; }
+
+    public int Version { get; set; }
+}
+
+public class PriceAgreementQuery : PagedQuery
+{
+    public string? SupplierId { get; set; }
+
+    public string? Keyword { get; set; }
+
+    public EnableStatus? Status { get; set; }
+}

@@ -8,6 +8,8 @@ using Panshi.Repository;
 using Panshi.Service.Base;
 using Panshi.Service.Biz;
 using Panshi.Service.Flow;
+using Panshi.Service.Md;
+using Panshi.Service.Scm;
 using Panshi.Service.Sys;
 using SqlSugar;
 
@@ -84,7 +86,10 @@ public class PgFixture : IAsyncLifetime
         =>
         [
             new ExpenseFlowHandler(Repo<BizExpense>()),
-            new PurchaseFlowHandler(Repo<BizPurchaseRequest>())
+            new PurchaseFlowHandler(Repo<BizPurchaseRequest>()),
+            // 订单审批回调靠 BusinessTable 匹配，这里漏注册=集成测试走不到回调（与 Program.cs 是两处清单）
+            new PurchaseOrderFlowHandler(Repo<ScmPurchaseOrder>(), Repo<ScmPurchaseOrderLine>()),
+            new SalesOrderFlowHandler(Repo<ScmSalesOrder>(), Repo<ScmSalesOrderLine>())
         ];
 
     public FlowEngineService Engine()
@@ -94,6 +99,25 @@ public class PgFixture : IAsyncLifetime
 
     public ExpenseService Expenses()
         => new(Repo<BizExpense>(), Engine(), DataScope());
+
+    public MaterialService Materials() => new(Repo<MdMaterial>());
+
+    public SupplierService Suppliers() => new(Repo<MdSupplier>());
+
+    public CustomerService Customers() => new(Repo<MdCustomer>());
+
+    public WarehouseService Warehouses() => new(Repo<MdWarehouse>());
+
+    public PriceAgreementService Prices()
+        => new(Repo<MdPriceAgreement>(), Repo<MdSupplier>(), Repo<MdMaterial>());
+
+    public PurchaseOrderService PurchaseOrders()
+        => new(Repo<ScmPurchaseOrder>(), Repo<ScmPurchaseOrderLine>(), Repo<MdSupplier>(), Repo<MdMaterial>(),
+            Repo<BizPurchaseRequest>(), Engine(), DataScope());
+
+    public SalesOrderService SalesOrders()
+        => new(Repo<ScmSalesOrder>(), Repo<ScmSalesOrderLine>(), Repo<MdCustomer>(), Repo<MdMaterial>(),
+            Repo<MdWarehouse>(), Engine(), DataScope());
 
     public DeptService Depts() => new(Repo<SysDept>(), Repo<SysUser>());
 

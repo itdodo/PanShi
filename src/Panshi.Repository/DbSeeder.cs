@@ -234,7 +234,7 @@ public static class DbSeeder
         Page(307, 3, "单据绑定", "/flow/binding", "flow/binding/index", "workflow:binding:list", "lucide:link", 7);
         Btn(3071, 307, "换绑/停用", "workflow:binding:edit");
 
-        Dir(4, "业务模块", "lucide:folder-kanban", 5);
+        Dir(4, "业务模块", "lucide:folder-kanban", 6);
         Page(401, 4, "报销单", "/biz/expense", "biz/expense/index", "biz:expense:list", "lucide:receipt", 1);
         Btn(4011, 401, "新增", "biz:expense:add");
         Btn(4012, 401, "编辑", "biz:expense:edit");
@@ -247,7 +247,7 @@ public static class DbSeeder
         Btn(4023, 402, "删除", "biz:purchase:delete");
         Btn(4024, 402, "提交审批", "biz:purchase:submit");
 
-        Dir(5, "日志审计", "lucide:scroll-text", 6);
+        Dir(5, "日志审计", "lucide:scroll-text", 7);
         Page(501, 5, "操作日志", "/monitor/operlog", "monitor/operlog/index", "monitor:operlog:list",
             "lucide:activity", 1);
         Btn(5011, 501, "导出", "monitor:operlog:export");
@@ -260,7 +260,7 @@ public static class DbSeeder
             "lucide:git-compare", 3);
         Btn(5031, 503, "清理", "monitor:changelog:clean");
 
-        Dir(6, "系统监控", "lucide:monitor", 7);
+        Dir(6, "系统监控", "lucide:monitor", 8);
         Page(601, 6, "在线用户", "/monitor/online", "monitor/online/index", "monitor:online:list",
             "lucide:wifi", 1);
         Btn(6011, 601, "强退", "monitor:online:kick");
