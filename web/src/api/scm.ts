@@ -373,3 +373,54 @@ export interface SupplierPerformanceQuery extends PageQuery {
 }
 export const pageSupplierPerformance = (q: SupplierPerformanceQuery) =>
   get<PagedResult<SupplierPerformanceDto>>('/scm/supplier-performance/page', q)
+
+/**
+ * 采购到货计划（/scm/arrival）：一条已批准的采购订单行 = 一条计划，人工只能改期。
+ * 已收量在查询时从「已过账 + 回链了本订单号」的采购入库单实时汇总，所以没有第二个录入口，
+ * 作废/红冲也自动反映到未收量上。
+ */
+export const ARRIVAL_STATUS = { Pending: 1, Partial: 2, Done: 3 } as const
+
+export function arrivalStatusMeta(status?: number | null): { label: string; type: 'default' | 'info' | 'success' } {
+  if (status === ARRIVAL_STATUS.Done) return { label: '已收满', type: 'success' }
+  if (status === ARRIVAL_STATUS.Partial) return { label: '部分到货', type: 'info' }
+  return { label: '待到货', type: 'default' }
+}
+
+export interface ArrivalDto {
+  id: string
+  orderId: string
+  orderNo: string
+  orderLineId: string
+  supplierId: string
+  supplierName: string
+  materialId: string
+  materialCode: string
+  materialName: string
+  spec?: string | null
+  unit?: string | null
+  planQty: number
+  planDate: string
+  receivedQty: number
+  /** 未收量；超收时为负数 */
+  openQty: number
+  status: number
+  overdue: boolean
+  rescheduled: boolean
+  ownerUserName: string
+  remark?: string | null
+  createTime: string
+  version: number
+}
+export interface ArrivalQuery extends PageQuery {
+  keyword?: string
+  supplierId?: string | null
+  status?: number | null
+  overdueOnly?: boolean
+  /** 计划日到这个日期为止（含当天） */
+  dueBefore?: string
+  mine?: boolean
+}
+export const pageArrivals = (q: ArrivalQuery) => get<PagedResult<ArrivalDto>>('/scm/arrival/page', q)
+export const rescheduleArrival = (id: string, d: { planDate: string, remark?: string | null, version: number }) =>
+  put<VoidResult>(`/scm/arrival/${id}/reschedule`, d)

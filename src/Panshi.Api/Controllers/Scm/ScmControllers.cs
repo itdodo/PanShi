@@ -97,3 +97,22 @@ public class SupplierPerformanceController(SupplierPerformanceService perf) : Ap
     public async Task<PagedResult<SupplierPerformanceDto>> Page([FromQuery] SupplierPerformanceQuery query)
         => await perf.PageAsync(query);
 }
+
+/// <summary>
+/// 采购到货计划。计划由采购订单批准后自动生成（一行一条），这里只提供查询与改期——
+/// 实际到货量来自已过账的采购入库单，所以没有「登记到货」这个第二入口，也就不会有两本账。
+/// </summary>
+[ApiController]
+[Authorize]
+[Route("api/v1/scm/arrival")]
+[Tags("供应链-到货计划")]
+public class ArrivalController(ArrivalService arrivals) : ApiControllerBase
+{
+    [HttpGet("page")]
+    [HasPermission("scm:arrival:list")]
+    public async Task<PagedResult<ArrivalDto>> Page([FromQuery] ArrivalQuery query) => await arrivals.PageAsync(query, Uid);
+
+    [HttpPut("{id:long}/reschedule")]
+    [HasPermission("scm:arrival:edit")]
+    public async Task Reschedule(long id, [FromBody] ArrivalRescheduleDto dto) => await arrivals.RescheduleAsync(id, dto);
+}

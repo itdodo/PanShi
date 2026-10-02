@@ -73,7 +73,8 @@ public class PurchaseOrderService(
     IRepository<MdMaterial> materials,
     IRepository<BizPurchaseRequest> requests,
     FlowEngineService engine,
-    DataScopeService dataScope) : BaseService<ScmPurchaseOrder>(repo)
+    DataScopeService dataScope,
+    ArrivalService arrivals) : BaseService<ScmPurchaseOrder>(repo)
 {
     public const string Table = "scm_purchase_order";
 
@@ -194,6 +195,8 @@ public class PurchaseOrderService(
             doc.Status = BizDocStatus.Approved;
             doc.InstanceId = null;
             await Repo.UpdateColumnsAsync(doc, "Status", "InstanceId");
+            // 批准后才有「到货」可等：直通也要补计划，与审批回调那条路径同口径
+            await arrivals.GenerateForOrderAsync(doc.Id);
         }
         else
         {
@@ -273,7 +276,8 @@ public class PurchaseOrderService(
 /// <summary>采购订单审批回调（按 BusinessTable 关联——红线：勿按流程编码）。</summary>
 public class PurchaseOrderFlowHandler(
     IRepository<ScmPurchaseOrder> repo,
-    IRepository<ScmPurchaseOrderLine> lineRepo) : IFlowBusinessHandler
+    IRepository<ScmPurchaseOrderLine> lineRepo,
+    ArrivalService arrivals) : IFlowBusinessHandler
 {
     public string BusinessTable => PurchaseOrderService.Table;
 
@@ -296,6 +300,8 @@ public class PurchaseOrderFlowHandler(
             _ => BizDocStatus.Withdrawn
         };
         await repo.UpdateColumnsAsync(doc, "Status");
+        // 批准后才有「到货」可等；补计划幂等——只补缺失行，不覆盖人工改过的计划
+        if (doc.Status == BizDocStatus.Approved) await arrivals.GenerateForOrderAsync(doc.Id);
     }
 }
 

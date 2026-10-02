@@ -187,3 +187,66 @@ public class ScmSalesOrderLine : BaseEntity
     [SugarColumn(IsNullable = true, Length = 256)]
     public string? Remark { get; set; }
 }
+
+/// <summary>
+/// 采购到货计划：一条已批准的订单行对应一条（唯一索引见迁移 0011）。
+/// 只存「计划」——实际到货量在查询时从已过账的采购入库单实时算，
+/// 所以过账路径不用改动，作废/红冲也会自动反映到未收量上。
+/// </summary>
+[SugarTable("scm_purchase_arrival")]
+public class ScmPurchaseArrival : BaseEntity, IDataScope
+{
+    [SugarColumn(ColumnDataType = "bigint")]
+    public long OrderId { get; set; }
+
+    /// <summary>采购订单号快照（对账时按它回链）</summary>
+    [SugarColumn(Length = 32)]
+    public string OrderNo { get; set; } = "";
+
+    /// <summary>来源订单行；一行一条计划</summary>
+    [SugarColumn(ColumnDataType = "bigint")]
+    public long OrderLineId { get; set; }
+
+    [SugarColumn(ColumnDataType = "bigint")]
+    public long SupplierId { get; set; }
+
+    [SugarColumn(Length = 128)]
+    public string SupplierName { get; set; } = "";
+
+    [SugarColumn(ColumnDataType = "bigint")]
+    public long MaterialId { get; set; }
+
+    [SugarColumn(Length = 32)]
+    public string MaterialCode { get; set; } = "";
+
+    [SugarColumn(Length = 128)]
+    public string MaterialName { get; set; } = "";
+
+    [SugarColumn(IsNullable = true, Length = 128)]
+    public string? Spec { get; set; }
+
+    [SugarColumn(IsNullable = true, Length = 16)]
+    public string? Unit { get; set; }
+
+    /// <summary>计划到货数量，默认取订单行数量</summary>
+    [SugarColumn(ColumnDataType = "numeric(18,4)")]
+    public decimal PlanQty { get; set; }
+
+    /// <summary>计划到货日，默认取订单交期；可在页面上逐行改期</summary>
+    public DateTime PlanDate { get; set; }
+
+    /// <summary>是否人工改过期。重新生成只补新行，绝不覆盖改过的计划</summary>
+    public bool Rescheduled { get; set; }
+
+    [SugarColumn(IsNullable = true, ColumnDataType = "bigint")]
+    public long? OwnerUserId { get; set; }
+
+    [SugarColumn(Length = 64)]
+    public string OwnerUserName { get; set; } = "";
+
+    [SugarColumn(IsNullable = true, ColumnDataType = "bigint")]
+    public long? DeptId { get; set; }
+
+    [SugarColumn(IsNullable = true, Length = 256)]
+    public string? Remark { get; set; }
+}

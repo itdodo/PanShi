@@ -216,3 +216,16 @@ public enum StockAlertLevel
     /// <summary>高于上限</summary>
     Over = 2
 }
+
+/// <summary>到货计划收货进度（由「计划量 vs 已过账采购入库量」实时推导，不落库）</summary>
+public enum ArrivalStatus
+{
+    /// <summary>还没收到货</summary>
+    Pending = 1,
+
+    /// <summary>部分到货</summary>
+    Partial = 2,
+
+    /// <summary>收满（含超收）</summary>
+    Done = 3
+}

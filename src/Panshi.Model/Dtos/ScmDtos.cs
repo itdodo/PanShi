@@ -193,3 +193,83 @@ public class SalesOrderSaveDto
 
     public int Version { get; set; }
 }
+
+public class ArrivalDto
+{
+    public string Id { get; set; } = "";
+
+    public string OrderId { get; set; } = "";
+
+    public string OrderNo { get; set; } = "";
+
+    public string OrderLineId { get; set; } = "";
+
+    public string SupplierId { get; set; } = "";
+
+    public string SupplierName { get; set; } = "";
+
+    public string MaterialId { get; set; } = "";
+
+    public string MaterialCode { get; set; } = "";
+
+    public string MaterialName { get; set; } = "";
+
+    public string? Spec { get; set; }
+
+    public string? Unit { get; set; }
+
+    public decimal PlanQty { get; set; }
+
+    public DateTime PlanDate { get; set; }
+
+    /// <summary>已过账的采购入库量（按订单号 + 物料汇总，作废的不算）</summary>
+    public decimal ReceivedQty { get; set; }
+
+    /// <summary>未收量；超收时为负数</summary>
+    public decimal OpenQty { get; set; }
+
+    public ArrivalStatus Status { get; set; }
+
+    /// <summary>未收满且计划日已过——逾期是推导出来的，不存状态位，免得改期/入库后要回头同步</summary>
+    public bool Overdue { get; set; }
+
+    public bool Rescheduled { get; set; }
+
+    public string OwnerUserName { get; set; } = "";
+
+    public string? Remark { get; set; }
+
+    public DateTime CreateTime { get; set; }
+
+    public int Version { get; set; }
+}
+
+public class ArrivalQuery : PagedQuery
+{
+    /// <summary>命中订单号 / 供应商 / 物料编码与名称</summary>
+    public string? Keyword { get; set; }
+
+    public string? SupplierId { get; set; }
+
+    public ArrivalStatus? Status { get; set; }
+
+    /// <summary>只看逾期未收满的</summary>
+    public bool OverdueOnly { get; set; }
+
+    /// <summary>计划日到这个日期为止（含当天）</summary>
+    public DateTime? DueBefore { get; set; }
+
+    public bool Mine { get; set; }
+}
+
+public class ArrivalRescheduleDto
+{
+    [Required]
+    public DateTime PlanDate { get; set; }
+
+    [StringLength(256)]
+    public string? Remark { get; set; }
+
+    /// <summary>乐观锁回显值（红线 #6）</summary>
+    public int Version { get; set; }
+}

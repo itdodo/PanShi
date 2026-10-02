@@ -88,7 +88,7 @@ public class PgFixture : IAsyncLifetime
             new ExpenseFlowHandler(Repo<BizExpense>()),
             new PurchaseFlowHandler(Repo<BizPurchaseRequest>()),
             // 订单审批回调靠 BusinessTable 匹配，这里漏注册=集成测试走不到回调（与 Program.cs 是两处清单）
-            new PurchaseOrderFlowHandler(Repo<ScmPurchaseOrder>(), Repo<ScmPurchaseOrderLine>()),
+            new PurchaseOrderFlowHandler(Repo<ScmPurchaseOrder>(), Repo<ScmPurchaseOrderLine>(), Arrivals()),
             new SalesOrderFlowHandler(Repo<ScmSalesOrder>(), Repo<ScmSalesOrderLine>())
         ];
 
@@ -128,9 +128,13 @@ public class PgFixture : IAsyncLifetime
     public SupplierPerformanceService SupplierPerf()
         => new(Repo<ScmPurchaseOrder>(), Repo<ScmStockDoc>());
 
+    public ArrivalService Arrivals()
+        => new(Repo<ScmPurchaseArrival>(), Repo<ScmPurchaseOrder>(), Repo<ScmPurchaseOrderLine>(),
+            Repo<ScmStockDoc>(), Repo<ScmStockDocLine>(), DataScope());
+
     public PurchaseOrderService PurchaseOrders()
         => new(Repo<ScmPurchaseOrder>(), Repo<ScmPurchaseOrderLine>(), Repo<MdSupplier>(), Repo<MdMaterial>(),
-            Repo<BizPurchaseRequest>(), Engine(), DataScope());
+            Repo<BizPurchaseRequest>(), Engine(), DataScope(), Arrivals());
 
     public SalesOrderService SalesOrders()
         => new(Repo<ScmSalesOrder>(), Repo<ScmSalesOrderLine>(), Repo<MdCustomer>(), Repo<MdMaterial>(),
