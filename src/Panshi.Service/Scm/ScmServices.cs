@@ -251,9 +251,8 @@ public class PurchaseOrderService(
 
     private async Task<string> NextDocNoAsync()
     {
-        var prefix = "PO" + DateTime.Now.ToString("yyyyMMdd");
-        var count = await Repo.CountAsync(o => o.DocNo.StartsWith(prefix));
-        return $"{prefix}{count + 1:D3}";
+        var day = DateTime.Now.ToString("yyyyMMdd");
+        return await DocNumbers.NextAsync(Repo.Db, "PO", () => Repo.CountAsync(o => o.DocNo.StartsWith("PO" + day)));
     }
 
     private static OrderLineDto ToLineDto(ScmPurchaseOrderLine l) => new()
@@ -484,9 +483,8 @@ public class SalesOrderService(
 
     private async Task<string> NextDocNoAsync()
     {
-        var prefix = "SO" + DateTime.Now.ToString("yyyyMMdd");
-        var count = await Repo.CountAsync(o => o.DocNo.StartsWith(prefix));
-        return $"{prefix}{count + 1:D3}";
+        var day = DateTime.Now.ToString("yyyyMMdd");
+        return await DocNumbers.NextAsync(Repo.Db, "SO", () => Repo.CountAsync(o => o.DocNo.StartsWith("SO" + day)));
     }
 
     private static OrderLineDto ToLineDto(ScmSalesOrderLine l) => new()

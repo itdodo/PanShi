@@ -127,10 +127,8 @@ public class ExpenseService(
 
     private async Task<string> NextDocNoAsync()
     {
-        var day = DateTime.Now.ToString("yyyyMMdd");
-        var prefix = "BX" + day;
-        var count = await Repo.CountAsync(e => e.DocNo.StartsWith(prefix));
-        return $"{prefix}{count + 1:D3}";
+        var prefix = "BX" + DateTime.Now.ToString("yyyyMMdd");
+        return await DocNumbers.NextAsync(Repo.Db, "BX", () => Repo.CountAsync(e => e.DocNo.StartsWith(prefix)));
     }
 
     internal static string? SerializeIds(List<string> ids) =>
@@ -218,10 +216,11 @@ public class PurchaseService(
     public async Task<PurchaseDto> CreateAsync(PurchaseSaveDto dto, long userId, string userName, long? deptId)
     {
         var day = DateTime.Now.ToString("yyyyMMdd");
-        var count = await Repo.CountAsync(p => p.DocNo.StartsWith("CG" + day));
+        var docNo = await DocNumbers.NextAsync(Repo.Db, "CG",
+            () => Repo.CountAsync(p => p.DocNo.StartsWith("CG" + day)));
         var doc = new BizPurchaseRequest
         {
-            DocNo = $"CG{day}{count + 1:D3}", OwnerUserId = userId, OwnerUserName = userName, DeptId = deptId,
+            DocNo = docNo, OwnerUserId = userId, OwnerUserName = userName, DeptId = deptId,
             ItemName = dto.ItemName, Quantity = dto.Quantity, Amount = dto.Amount, Reason = dto.Reason,
             AttachmentIds = ExpenseService.SerializeIds(dto.AttachmentIds), Status = BizDocStatus.Draft
         };

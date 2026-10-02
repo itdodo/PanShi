@@ -72,6 +72,24 @@ public class PgFixture : IAsyncLifetime
     // ---------------- 服务装配（DI-lite） ----------------
     public IRepository<T> Repo<T>() where T : BaseEntity, new() => new SqlSugarRepository<T>(Db);
 
+    /// <summary>
+    /// 另开一套独立上下文。并发用例必须每个任务一套仓储——线上是「一个请求一个 DI 作用域一条连接」，
+    /// 复用 fixture 的 Db 会让所有任务挤在同一条连接/同一个事务里，测出来的不是并发行为。
+    /// </summary>
+    public SqlSugarScope NewDb() => SqlSugarSetup.CreateDb(new DbOptions { ConnectionString = Conn, SnowflakeWorkerId = 3 });
+
+    /// <summary>
+    /// 并发用例专用：整条依赖链都挂在给定连接上。哪怕只漏一个共享仓储（物料/仓库/数据权限），
+    /// 20 个任务挤同一根连接就会报「A command is already in progress」。
+    /// </summary>
+    public StockDocService StockDocsOn(ISqlSugarClient db)
+        => new(new SqlSugarRepository<ScmStockDoc>(db), new SqlSugarRepository<ScmStockDocLine>(db),
+            new SqlSugarRepository<ScmStock>(db), new SqlSugarRepository<ScmStockLedger>(db),
+            new SqlSugarRepository<MdMaterial>(db), new SqlSugarRepository<MdWarehouse>(db),
+            new DataScopeService(new SqlSugarRepository<SysUser>(db), new SqlSugarRepository<SysUserRole>(db),
+                new SqlSugarRepository<SysRole>(db), new SqlSugarRepository<SysRoleDept>(db),
+                new SqlSugarRepository<SysDept>(db)));
+
     public MemoryCacheService Cache() => new(new MemoryCache(new MemoryCacheOptions()));
 
     public ConfigService Config() => new(Repo<SysConfig>(), Cache());

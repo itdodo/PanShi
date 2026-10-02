@@ -1,5 +1,6 @@
 using Panshi.Common.Exceptions;
 using Panshi.Common.Results;
+using Panshi.Common.Runtime;
 using Panshi.Model.Dtos;
 using Panshi.Model.Entities;
 using Panshi.Model.Enums;
@@ -236,41 +237,53 @@ public class StockDocService(
     {
         if (delta == 0) return; // 盘点无差异：不记流水，免得账本里全是 0
 
-        var stock = await stockRepo.FindAsync(s => s.WarehouseId == warehouseId && s.MaterialId == line.MaterialId);
-        var before = stock?.Quantity ?? 0m;
-        var after = before + delta;
-        if (after < 0)
-            throw new BizException($"「{line.Name}」在「{warehouseName}」库存不足：当前 {before:0.####}，本次要出 {Math.Abs(delta):0.####}");
-
-        if (stock is null)
+        var after = await MoveStockAsync(warehouseId, warehouseName, line, delta, bizTime);
+        if (after is null)
         {
-            await stockRepo.InsertAsync(new ScmStock
-            {
-                WarehouseId = warehouseId, WarehouseName = warehouseName, MaterialId = line.MaterialId,
-                MaterialCode = line.Code, MaterialName = line.Name, Unit = line.Unit, Quantity = after,
-                UpdateTime = bizTime
-            });
-        }
-        else
-        {
-            stock.Quantity = after;
-            stock.MaterialCode = line.Code;
-            stock.MaterialName = line.Name;
-            stock.Unit = line.Unit;
-            stock.WarehouseName = warehouseName;
-            // UpdateTime 由 AOP 赋值，但 UpdateColumns 只写列名清单里的列——不带上「最后变动」就永远是空
-            await stockRepo.UpdateColumnsAsync(stock, "Quantity", "MaterialCode", "MaterialName", "Unit",
-                "WarehouseName", "UpdateTime");
-
+            var current = await BookQtyAsync(warehouseId, line.MaterialId);
+            throw new BizException($"「{line.Name}」在「{warehouseName}」库存不足：当前 {current:0.####}，本次要出 {Math.Abs(delta):0.####}");
         }
 
         await ledgerRepo.InsertAsync(new ScmStockLedger
         {
             DocId = doc.Id, DocNo = doc.DocNo, Kind = doc.Kind, WarehouseId = warehouseId,
             WarehouseName = warehouseName, MaterialId = line.MaterialId, MaterialCode = line.Code,
-            MaterialName = line.Name, Unit = line.Unit, ChangeQty = delta, BeforeQty = before, AfterQty = after,
-            BizTime = bizTime, OperatorName = operatorName
+            MaterialName = line.Name, Unit = line.Unit, ChangeQty = delta, BeforeQty = after.Value - delta,
+            AfterQty = after.Value, BizTime = bizTime, OperatorName = operatorName
         });
+    }
+
+    /// <summary>
+    /// 台账的一跳：一条 UPSERT…RETURNING，返回新现存量；null = 这一跳会把库存减成负数。
+    /// ⚠️ 别退回「先查再按主键写 quantity」——两个并发出库会各自读到同一余额、双双通过校验，
+    /// 后者把前者的扣减盖掉，台账就此超卖（压测实测 20 并发抢 50 库存能全过）。
+    /// ⚠️ 也不要把「delta &lt; 0 就不插行」写成 insert…select…where @delta &gt;= 0：
+    /// 源查询一旦被过滤掉就根本没有插入动作，ON CONFLICT DO UPDATE 也就永远不触发（实测 0 行）。
+    /// 所以负数跳先确认有行；行存在时减成负数由 UPSERT 的守卫兜住。
+    /// </summary>
+    private async Task<decimal?> MoveStockAsync(long warehouseId, string warehouseName, ResolvedStockLine line,
+        decimal delta, DateTime bizTime)
+    {
+        if (delta < 0 && !await stockRepo.ExistsAsync(s => s.WarehouseId == warehouseId && s.MaterialId == line.MaterialId))
+            return null; // 这仓这料一行都没有，出库=库存不足；不能插一行负数出来
+
+        var after = await Repo.Db.Ado.SqlQueryAsync<decimal>(
+            "insert into scm_stock (id, warehouse_id, warehouse_name, material_id, material_code, material_name, "
+            + "unit, quantity, create_time, update_time, is_deleted, version) "
+            + "values (@id, @warehouseId, @warehouseName, @materialId, @code, @name, @unit, @delta, now(), @bizTime, "
+            + "false, 0) "
+            + "on conflict (warehouse_id, material_id) where is_deleted = false "
+            + "do update set quantity = scm_stock.quantity + @delta, update_time = @bizTime, "
+            + "warehouse_name = excluded.warehouse_name, material_code = excluded.material_code, "
+            + "material_name = excluded.material_name, unit = excluded.unit "
+            + "where scm_stock.quantity + @delta >= 0 "
+            + "returning quantity",
+            new
+            {
+                id = SnowflakeId.NextId(), warehouseId, warehouseName, materialId = line.MaterialId,
+                code = line.Code, name = line.Name, unit = line.Unit, delta, bizTime
+            });
+        return after.Count == 0 ? null : after[0];
     }
 
     private async Task<decimal> BookQtyAsync(long warehouseId, long materialId)
@@ -338,9 +351,9 @@ public class StockDocService(
 
     private async Task<string> NextDocNoAsync(StockDocKind kind)
     {
-        var prefix = Prefixes[kind] + DateTime.Now.ToString("yyyyMMdd");
-        var count = await Repo.CountAsync(d => d.DocNo.StartsWith(prefix));
-        return $"{prefix}{count + 1:D3}";
+        var day = DateTime.Now.ToString("yyyyMMdd");
+        var prefix = Prefixes[kind];
+        return await DocNumbers.NextAsync(Repo.Db, prefix, () => Repo.CountAsync(d => d.DocNo.StartsWith(prefix + day)));
     }
 
     private static long ParseMaterialId(string raw)
