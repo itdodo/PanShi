@@ -243,3 +243,49 @@ public class StockAlertQuery : PagedQuery
 
     public StockAlertLevel? Level { get; set; }
 }
+
+public class StockSummaryDto
+{
+    public string WarehouseId { get; set; } = "";
+
+    public string WarehouseName { get; set; } = "";
+
+    public string MaterialId { get; set; } = "";
+
+    public string MaterialCode { get; set; } = "";
+
+    public string MaterialName { get; set; } = "";
+
+    public string? Spec { get; set; }
+
+    public string? Unit { get; set; }
+
+    /// <summary>期初结存：区间开始之前所有流水的累计和</summary>
+    public decimal Opening { get; set; }
+
+    /// <summary>本期收入：区间内正向变动合计</summary>
+    public decimal Inbound { get; set; }
+
+    /// <summary>本期发出：区间内负向变动合计（正数表示发出了多少）</summary>
+    public decimal Outbound { get; set; }
+
+    /// <summary>期末结存 = 期初 + 收入 − 发出</summary>
+    public decimal Closing { get; set; }
+
+    /// <summary>本期流水笔数</summary>
+    public int Entries { get; set; }
+}
+
+public class StockSummaryQuery : PagedQuery
+{
+    /// <summary>统计起始日（必填，按整天含头）。期初要按它回看历史流水</summary>
+    public DateTime? Begin { get; set; }
+
+    /// <summary>统计截止日（含当天，留空=到今天）</summary>
+    public DateTime? End { get; set; }
+
+    public string? WarehouseId { get; set; }
+
+    /// <summary>命中物料编码/名称</summary>
+    public string? Keyword { get; set; }
+}

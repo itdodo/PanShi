@@ -86,3 +86,15 @@ public class StockAlertController(StockAlertService alerts) : ApiControllerBase
     [HasPermission("scm:alert:list")]
     public async Task<PagedResult<StockAlertDto>> Page([FromQuery] StockAlertQuery query) => await alerts.PageAsync(query);
 }
+
+/// <summary>进销存汇总（只读报表）。期初/收入/发出/期末按流水聚合，与库存台账对账用。</summary>
+[ApiController]
+[Authorize]
+[Route("api/v1/scm/stock-summary")]
+[Tags("供应链-进销存汇总")]
+public class StockSummaryController(StockSummaryService summary) : ApiControllerBase
+{
+    [HttpGet("page")]
+    [HasPermission("scm:summary:list")]
+    public async Task<PagedResult<StockSummaryDto>> Page([FromQuery] StockSummaryQuery query) => await summary.PageAsync(query);
+}

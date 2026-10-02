@@ -320,3 +320,31 @@ export interface StockAlertQuery extends PageQuery {
   level?: number | null
 }
 export const pageStockAlerts = (q: StockAlertQuery) => get<PagedResult<StockAlertDto>>('/scm/stock-alert/page', q)
+
+/**
+ * 进销存汇总（/scm/stock-summary）：期初 / 收入 / 发出 / 期末，全部由库存流水聚合而来，
+ * 所以「期初 + 收入 − 发出 = 期末」对任意区间都成立，而不只是区间到今天。
+ */
+export interface StockSummaryDto {
+  warehouseId: string
+  warehouseName: string
+  materialId: string
+  materialCode: string
+  materialName: string
+  spec?: string | null
+  unit?: string | null
+  opening: number
+  inbound: number
+  outbound: number
+  closing: number
+  entries: number
+}
+export interface StockSummaryQuery extends PageQuery {
+  /** 起始日 YYYY-MM-DD，必填 */
+  begin?: string
+  /** 截止日 YYYY-MM-DD，含当天 */
+  end?: string
+  warehouseId?: string | null
+  keyword?: string
+}
+export const pageStockSummary = (q: StockSummaryQuery) => get<PagedResult<StockSummaryDto>>('/scm/stock-summary/page', q)
