@@ -286,3 +286,37 @@ export interface LedgerQuery extends PageQuery {
   end?: string
 }
 export const pageLedger = (q: LedgerQuery) => get<PagedResult<LedgerDto>>('/scm/ledger/page', q)
+
+/**
+ * 库存预警（/scm/stock-alert）：阈值挂在物料主数据上，后端按「启用仓库 × 设了阈值的物料」展开，
+ * 没有台账行的按 0 存量算——从没入过库的新料恰恰最该报警。
+ */
+export const ALERT_LEVELS = { Short: 1, Over: 2 } as const
+
+export function alertLevelMeta(level?: number | null): { label: string; type: 'warning' | 'error' } {
+  return level === ALERT_LEVELS.Over
+    ? { label: '超储', type: 'warning' }
+    : { label: '缺货', type: 'error' }
+}
+
+export interface StockAlertDto {
+  warehouseId: string
+  warehouseName: string
+  materialId: string
+  materialCode: string
+  materialName: string
+  spec?: string | null
+  unit?: string | null
+  minStock?: number | null
+  maxStock?: number | null
+  quantity: number
+  level: number
+  /** 缺货=还差多少到下限；超储=超出上限多少 */
+  gap: number
+}
+export interface StockAlertQuery extends PageQuery {
+  keyword?: string
+  warehouseId?: string | null
+  level?: number | null
+}
+export const pageStockAlerts = (q: StockAlertQuery) => get<PagedResult<StockAlertDto>>('/scm/stock-alert/page', q)

@@ -76,6 +76,11 @@ public class MaterialService(IRepository<MdMaterial> repo) : BaseService<MdMater
         m.Unit = Blank.ToNull(dto.Unit);
         m.PurchasePrice = dto.PurchasePrice;
         m.SalePrice = dto.SalePrice;
+        if (dto.MinStock is < 0 || dto.MaxStock is < 0) throw new BizException("预警上下限不能为负");
+        if (dto.MinStock is { } min && dto.MaxStock is { } max && max <= min)
+            throw new BizException("预警上限要大于下限，否则任何库存量都会同时报两种预警");
+        m.MinStock = dto.MinStock;
+        m.MaxStock = dto.MaxStock;
         m.Status = dto.Status;
         m.Remark = Blank.ToNull(dto.Remark);
     }
@@ -83,7 +88,8 @@ public class MaterialService(IRepository<MdMaterial> repo) : BaseService<MdMater
     private static MaterialDto ToDto(MdMaterial m) => new()
     {
         Id = m.Id.ToString(), MaterialCode = m.MaterialCode, MaterialName = m.MaterialName, Category = m.Category,
-        Spec = m.Spec, Unit = m.Unit, PurchasePrice = m.PurchasePrice, SalePrice = m.SalePrice, Status = m.Status,
+        Spec = m.Spec, Unit = m.Unit, PurchasePrice = m.PurchasePrice, SalePrice = m.SalePrice,
+        MinStock = m.MinStock, MaxStock = m.MaxStock, Status = m.Status,
         Remark = m.Remark, CreateTime = m.CreateTime, Version = m.Version
     };
 }

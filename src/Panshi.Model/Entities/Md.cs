@@ -38,6 +38,14 @@ public class MdMaterial : BaseEntity
     [SugarColumn(IsNullable = true, ColumnDataType = "numeric(18,2)")]
     public decimal? SalePrice { get; set; }
 
+    /// <summary>预警下限（安全库存）。空=该物料不做下限预警，与「下限=0」不同</summary>
+    [SugarColumn(IsNullable = true, ColumnDataType = "numeric(18,4)")]
+    public decimal? MinStock { get; set; }
+
+    /// <summary>预警上限（最高储备）。空=不做上限预警</summary>
+    [SugarColumn(IsNullable = true, ColumnDataType = "numeric(18,4)")]
+    public decimal? MaxStock { get; set; }
+
     public EnableStatus Status { get; set; } = EnableStatus.Enabled;
 
     [SugarColumn(IsNullable = true, Length = 512)]

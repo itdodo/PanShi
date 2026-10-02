@@ -17,6 +17,10 @@ export interface MaterialDto {
   unit?: string | null
   purchasePrice?: number | null
   salePrice?: number | null
+  /** 预警下限（安全库存），空=不预警 */
+  minStock?: number | null
+  /** 预警上限（最高储备），空=不预警 */
+  maxStock?: number | null
   status: number
   remark?: string | null
   createTime: string
@@ -30,6 +34,8 @@ export interface MaterialForm {
   unit?: string | null
   purchasePrice?: number | null
   salePrice?: number | null
+  minStock?: number | null
+  maxStock?: number | null
   status: number
   remark?: string | null
   version?: number

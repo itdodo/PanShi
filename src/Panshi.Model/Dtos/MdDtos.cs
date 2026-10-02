@@ -25,6 +25,12 @@ public class MaterialDto
 
     public decimal? SalePrice { get; set; }
 
+    /// <summary>预警下限（安全库存），空=不预警</summary>
+    public decimal? MinStock { get; set; }
+
+    /// <summary>预警上限（最高储备），空=不预警</summary>
+    public decimal? MaxStock { get; set; }
+
     public EnableStatus Status { get; set; }
 
     public string? Remark { get; set; }
@@ -54,6 +60,12 @@ public class MaterialSaveDto
     public decimal? PurchasePrice { get; set; }
 
     public decimal? SalePrice { get; set; }
+
+    /// <summary>预警下限（安全库存）。留空=不做下限预警，别填 0 当空</summary>
+    public decimal? MinStock { get; set; }
+
+    /// <summary>预警上限（最高储备）</summary>
+    public decimal? MaxStock { get; set; }
 
     public EnableStatus Status { get; set; } = EnableStatus.Enabled;
 

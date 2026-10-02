@@ -74,3 +74,15 @@ public class LedgerController(LedgerService ledger) : ApiControllerBase
     [HasPermission("scm:ledger:list")]
     public async Task<PagedResult<LedgerDto>> Page([FromQuery] LedgerQuery query) => await ledger.PageAsync(query);
 }
+
+/// <summary>库存预警（只读）。阈值挂在物料主数据上，这里只做展开与判档。</summary>
+[ApiController]
+[Authorize]
+[Route("api/v1/scm/stock-alert")]
+[Tags("供应链-库存预警")]
+public class StockAlertController(StockAlertService alerts) : ApiControllerBase
+{
+    [HttpGet("page")]
+    [HasPermission("scm:alert:list")]
+    public async Task<PagedResult<StockAlertDto>> Page([FromQuery] StockAlertQuery query) => await alerts.PageAsync(query);
+}

@@ -66,6 +66,8 @@ const form = reactive({
   unit: null as string | null,
   purchasePrice: null as number | null,
   salePrice: null as number | null,
+  minStock: null as number | null,
+  maxStock: null as number | null,
   status: 0,
   remark: '',
   version: 0
@@ -90,6 +92,8 @@ function openCreate(): void {
   form.unit = null
   form.purchasePrice = null
   form.salePrice = null
+  form.minStock = null
+  form.maxStock = null
   form.status = 0
   form.remark = ''
   form.version = 0
@@ -105,6 +109,8 @@ function openEdit(row: Row): void {
   form.unit = row.unit ?? null
   form.purchasePrice = row.purchasePrice ?? null
   form.salePrice = row.salePrice ?? null
+  form.minStock = row.minStock ?? null
+  form.maxStock = row.maxStock ?? null
   form.status = row.status
   form.remark = row.remark ?? ''
   form.version = row.version
@@ -120,6 +126,8 @@ function toPayload(): MaterialForm {
     unit: form.unit,
     purchasePrice: form.purchasePrice,
     salePrice: form.salePrice,
+    minStock: form.minStock,
+    maxStock: form.maxStock,
     status: form.status,
     remark: form.remark.trim() || null
   }
@@ -168,6 +176,15 @@ const columns = computed<DataTableColumns<Row>>(() => [
   { title: '单位', key: 'unit', width: 90, render: (row) => orMuted(unit.labelOf(row.unit)) },
   { title: '参考采购价', key: 'purchasePrice', width: 110, render: (row) => renderPrice(row.purchasePrice) },
   { title: '参考销售价', key: 'salePrice', width: 110, render: (row) => renderPrice(row.salePrice) },
+  {
+    title: '预警区间',
+    key: 'minStock',
+    width: 130,
+    render: (row) =>
+      row.minStock == null && row.maxStock == null
+        ? h('span', { class: 'ps-muted' }, '不预警')
+        : `${row.minStock ?? '—'} ~ ${row.maxStock ?? '—'}`
+  },
   { title: '状态', key: 'status', width: 88, render: (row) => renderStatusTag(row.status) },
   { title: '备注', key: 'remark', minWidth: 160, ellipsis: { tooltip: true }, render: (row) => orMuted(row.remark) },
   { title: '创建时间', key: 'createTime', width: 165, sorter: true, render: (row) => formatDateTime(row.createTime) },
@@ -306,6 +323,31 @@ onMounted(() => {
           <NGridItem :span="12">
             <NFormItem label="销售价" path="salePrice">
               <NInputNumber v-model:value="form.salePrice" :min="0" :precision="2" clearable style="width: 100%" />
+            </NFormItem>
+          </NGridItem>
+          <!-- 阈值留空=该物料不参与预警；填 0 是「下限 0」而不是不预警，两者语义不同 -->
+          <NGridItem :span="12">
+            <NFormItem label="预警下限" path="minStock">
+              <NInputNumber
+                v-model:value="form.minStock"
+                :min="0"
+                :precision="4"
+                clearable
+                placeholder="安全库存，空=不预警"
+                style="width: 100%"
+              />
+            </NFormItem>
+          </NGridItem>
+          <NGridItem :span="12">
+            <NFormItem label="预警上限" path="maxStock">
+              <NInputNumber
+                v-model:value="form.maxStock"
+                :min="0"
+                :precision="4"
+                clearable
+                placeholder="最高储备，空=不预警"
+                style="width: 100%"
+              />
             </NFormItem>
           </NGridItem>
           <NGridItem :span="24">

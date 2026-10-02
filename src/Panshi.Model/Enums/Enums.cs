@@ -206,3 +206,13 @@ public enum StockDocStatus
     /// <summary>已作废：过账后发现错，用反向单冲销后作废本单</summary>
     Void = 2
 }
+
+/// <summary>库存预警档位</summary>
+public enum StockAlertLevel
+{
+    /// <summary>低于下限（含完全没有台账行的 0 存量）</summary>
+    Short = 1,
+
+    /// <summary>高于上限</summary>
+    Over = 2
+}

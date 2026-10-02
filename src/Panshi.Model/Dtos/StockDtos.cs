@@ -204,3 +204,42 @@ public class LedgerQuery : PagedQuery
 
     public DateTime? End { get; set; }
 }
+
+public class StockAlertDto
+{
+    public string WarehouseId { get; set; } = "";
+
+    public string WarehouseName { get; set; } = "";
+
+    public string MaterialId { get; set; } = "";
+
+    public string MaterialCode { get; set; } = "";
+
+    public string MaterialName { get; set; } = "";
+
+    public string? Spec { get; set; }
+
+    public string? Unit { get; set; }
+
+    public decimal? MinStock { get; set; }
+
+    public decimal? MaxStock { get; set; }
+
+    /// <summary>现存量（没有台账行按 0 算，不是 null）</summary>
+    public decimal Quantity { get; set; }
+
+    public StockAlertLevel Level { get; set; }
+
+    /// <summary>Short=还差多少到下限；Over=超出上限多少</summary>
+    public decimal Gap { get; set; }
+}
+
+public class StockAlertQuery : PagedQuery
+{
+    /// <summary>命中物料编码/名称</summary>
+    public string? Keyword { get; set; }
+
+    public string? WarehouseId { get; set; }
+
+    public StockAlertLevel? Level { get; set; }
+}
