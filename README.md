@@ -22,6 +22,20 @@ cd web && npm install && npm run dev
 docker compose up -d --build     # http://localhost:18080（API+SPA 单容器；主机 18080 → 容器 8080）
 ```
 
+### 口令从哪来
+
+仓库里**没有任何真口令**：`appsettings.json` 的 `Db:ConnectionString` 与集成测试的连接串用的都是占位值。
+
+```bash
+cp .env.example .env      # 填 PANSHI_DB_PASSWORD 与 PANSHI_JWT_SECRET；.env 已被 .gitignore 忽略
+```
+
+| 场景 | 生效的口令 |
+| --- | --- |
+| `docker compose up` | compose 读 `.env` 做 `${VAR:?}` 替换，并用 `Db__ConnectionString` 覆盖镜像里的占位连接串 |
+| `dotnet run`（本机 dev 5125） | 自己导：`export Db__ConnectionString="Host=localhost;Port=5432;Database=panshi;Username=panshi;Password=<.env 里的值>;Pooling=true"` |
+| `dotnet test`（集成，库 `panshi_test`） | 优先 `PANSHI_TEST_CONN`；没导就自动从仓库根 `.env` 取 `PANSHI_DB_PASSWORD` 拼，所以 `scripts/verify.sh` 不需要额外配置 |
+
 ## IP 黑白名单（安全 P1）
 
 监控 → IP 黑白名单（`monitor:ipguard:list` / `monitor:ipguard:manage`），接口在 `/api/v1/monitor/ip-rule`。

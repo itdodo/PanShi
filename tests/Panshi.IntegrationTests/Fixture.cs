@@ -52,8 +52,32 @@ public class PgFixture : IAsyncLifetime
     public ISqlSugarClient Db { get; private set; } = null!;
     public RecordingNotify Notify { get; } = new();
 
-    public static string Conn => Environment.GetEnvironmentVariable("PANSHI_TEST_CONN")
-        ?? "Host=localhost;Port=5432;Database=panshi_test;Username=panshi;Password=Panshi@2026;Pooling=true";
+    /// <summary>
+    /// 测试库连接串。口令不放仓库里：优先 <c>PANSHI_TEST_CONN</c>，
+    /// 否则按 docker compose 的习惯从仓库根 <c>.env</c> 取 <c>PANSHI_DB_PASSWORD</c> 拼出来
+    /// （clone 完 <c>cp .env.example .env</c> 填口令就能直接 dotnet test，不必再导环境变量）。
+    /// </summary>
+    public static string Conn
+    {
+        get
+        {
+            var fromEnv = Environment.GetEnvironmentVariable("PANSHI_TEST_CONN");
+            if (!string.IsNullOrWhiteSpace(fromEnv)) return fromEnv;
+            return $"Host=localhost;Port=5432;Database=panshi_test;Username=panshi;Password={EnvDbPassword()};Pooling=true";
+        }
+    }
+
+    private static string EnvDbPassword()
+    {
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir is not null && !File.Exists(Path.Combine(dir.FullName, ".env"))) dir = dir.Parent;
+        var line = dir is null ? "" : (File.ReadAllLines(Path.Combine(dir.FullName, ".env"))
+            .FirstOrDefault(l => l.StartsWith("PANSHI_DB_PASSWORD=")) ?? "");
+        var pwd = line[(line.IndexOf('=') + 1)..].Trim().Trim('"');
+        return pwd.Length > 0 ? pwd : throw new InvalidOperationException(
+            "集成测试要连真实 PG：既没有 PANSHI_TEST_CONN，也没在仓库根 .env 找到 PANSHI_DB_PASSWORD。"
+            + "先 cp .env.example .env 填口令（或直接 export PANSHI_TEST_CONN）。");
+    }
 
     public Task InitializeAsync()
     {
