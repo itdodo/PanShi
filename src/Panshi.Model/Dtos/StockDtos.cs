@@ -289,3 +289,44 @@ public class StockSummaryQuery : PagedQuery
     /// <summary>命中物料编码/名称</summary>
     public string? Keyword { get; set; }
 }
+
+public class SupplierPerformanceDto
+{
+    public string SupplierId { get; set; } = "";
+
+    public string SupplierName { get; set; } = "";
+
+    /// <summary>区间内已批准的采购订单数</summary>
+    public int Orders { get; set; }
+
+    public decimal Amount { get; set; }
+
+    /// <summary>至少有一张采购入库单回填了本订单号的订单数</summary>
+    public int Delivered { get; set; }
+
+    /// <summary>已到货且首次入库不早于计划交期的订单数（分母只算填了计划交期的已到货订单）</summary>
+    public int OnTime { get; set; }
+
+    /// <summary>参与准交率统计的订单数（已到货且有计划交期）</summary>
+    public int OnTimeBase { get; set; }
+
+    /// <summary>一张入库单都没关联上的订单数——不是「没收货」，也可能是入库时没回填单号</summary>
+    public int Pending { get; set; }
+
+    /// <summary>准交率 0~1；OnTimeBase=0 时为 null（没有计划交期就不该编出一个比率）</summary>
+    public decimal? OnTimeRate { get; set; }
+
+    /// <summary>平均交付天数：首次入库日 − 下单日，按已到货订单取均值</summary>
+    public decimal AvgLeadDays { get; set; }
+}
+
+public class SupplierPerformanceQuery : PagedQuery
+{
+    /// <summary>按下单日期筛（含头含尾），留空=最近一年</summary>
+    public DateTime? Begin { get; set; }
+
+    public DateTime? End { get; set; }
+
+    /// <summary>命中供应商名称</summary>
+    public string? Keyword { get; set; }
+}

@@ -84,3 +84,16 @@ public class SalesOrderController(SalesOrderService orders) : ApiControllerBase
     public async Task<SalesOrderDto> Submit(long id, [FromBody] FlowSubmitDto payload)
         => await orders.SubmitAsync(id, Uid, Name, payload);
 }
+
+/// <summary>供应商绩效（只读报表）。按下单日期区间统计订单量、准交率与平均交付天数。</summary>
+[ApiController]
+[Authorize]
+[Route("api/v1/scm/supplier-performance")]
+[Tags("供应链-供应商绩效")]
+public class SupplierPerformanceController(SupplierPerformanceService perf) : ApiControllerBase
+{
+    [HttpGet("page")]
+    [HasPermission("scm:supplierperf:list")]
+    public async Task<PagedResult<SupplierPerformanceDto>> Page([FromQuery] SupplierPerformanceQuery query)
+        => await perf.PageAsync(query);
+}

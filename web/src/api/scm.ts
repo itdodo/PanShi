@@ -348,3 +348,28 @@ export interface StockSummaryQuery extends PageQuery {
   keyword?: string
 }
 export const pageStockSummary = (q: StockSummaryQuery) => get<PagedResult<StockSummaryDto>>('/scm/stock-summary/page', q)
+
+/**
+ * 供应商绩效（/scm/supplier-performance）：订单↔入库靠入库单回填的「来源单号」关联，
+ * 所以「未到货」的真实含义是「没有能对上号的入库单」，读报表时要带着这句。
+ */
+export interface SupplierPerformanceDto {
+  supplierId: string
+  supplierName: string
+  orders: number
+  amount: number
+  delivered: number
+  onTime: number
+  onTimeBase: number
+  pending: number
+  /** 0~1；没有可统计的交期时为 null */
+  onTimeRate?: number | null
+  avgLeadDays: number
+}
+export interface SupplierPerformanceQuery extends PageQuery {
+  begin?: string
+  end?: string
+  keyword?: string
+}
+export const pageSupplierPerformance = (q: SupplierPerformanceQuery) =>
+  get<PagedResult<SupplierPerformanceDto>>('/scm/supplier-performance/page', q)

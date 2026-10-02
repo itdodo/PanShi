@@ -142,6 +142,7 @@ builder.Services.AddScoped<StockService>();
 builder.Services.AddScoped<LedgerService>();
 builder.Services.AddScoped<StockAlertService>();
 builder.Services.AddScoped<StockSummaryService>();
+builder.Services.AddScoped<SupplierPerformanceService>();
 builder.Services.AddScoped<FileAccessService>();
 // 红线 #7：IFlowBusinessHandler 多实现必须 AddScoped（TryAdd 只收第一个）
 builder.Services.AddScoped<IFlowBusinessHandler, ExpenseFlowHandler>();
