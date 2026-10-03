@@ -36,6 +36,20 @@ cp .env.example .env      # 填 PANSHI_DB_PASSWORD 与 PANSHI_JWT_SECRET；.env 
 | `dotnet run`（本机 dev 5125） | 自己导：`export Db__ConnectionString="Host=localhost;Port=5432;Database=panshi;Username=panshi;Password=<.env 里的值>;Pooling=true"` |
 | `dotnet test`（集成，库 `panshi_test`） | 优先 `PANSHI_TEST_CONN`；没导就自动从仓库根 `.env` 取 `PANSHI_DB_PASSWORD` 拼，所以 `scripts/verify.sh` 不需要额外配置 |
 
+### 健康检查与接口文档
+
+| 端点 | 含义 |
+| --- | --- |
+| `GET /api/v1/health` | **存活**探针：进程能应答即 200，不查依赖。容器 `HEALTHCHECK` 打这条——查依赖会让数据库抖一下就把 API 反复判死重启 |
+| `GET /api/v1/health/ready` | **就绪**探针：真的 `select 1` 问一次库（3 秒超时），不可用回 503。给反代/编排摘流量与人工排障用 |
+
+`/swagger` 与 `/openapi/v1.json` **仅开发态**暴露（生产等于把全部端点与 DTO 结构白送给任何能访问端口的人）。
+
+### 强制改密
+
+新建/导入/管理员重置的账号，口令未换之前服务端只放行 4 条端点（改密、看自己资料、刷新令牌、登出），其余一律 401 —— 前端路由的拦截只是提示，真正的门在 JWT 校验里。管理员重置密码会**同时下线该账号全部会话**并站内信通知本人。
+
+
 ## IP 黑白名单（安全 P1）
 
 监控 → IP 黑白名单（`monitor:ipguard:list` / `monitor:ipguard:manage`），接口在 `/api/v1/monitor/ip-rule`。

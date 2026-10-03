@@ -51,7 +51,8 @@ builder.Services.AddControllers(o =>
 
 builder.Services.AddOpenApi();
 builder.Services.AddProblemDetails();
-builder.Services.AddHealthChecks();
+// 存活探针 /api/v1/health 不带依赖检查；就绪探针 /api/v1/health/ready 才真的问一次数据库
+builder.Services.AddHealthChecks().AddCheck<DbHealthCheck>("database", tags: ["ready"]);
 builder.Services.AddMemoryCache();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddSignalR();
@@ -218,12 +219,17 @@ app.UseCors("web");
 app.UseMiddleware<IpGuardMiddleware>();
 app.UseRateLimiter();
 
-app.MapOpenApi();
-app.UseSwaggerUI(o =>
+// ⚠️ 接口面只在开发态开放：生产暴露 /swagger + /openapi/v1.json 等于把 185 个端点与全部 DTO 结构
+// 白送给任何能访问端口的人（认证边界盘点第 ⑤ 条）。需要对外给文档，走反代 + 基本认证另开开关。
+if (app.Environment.IsDevelopment())
 {
-    o.SwaggerEndpoint("/openapi/v1.json", "磐石 API");
-    o.RoutePrefix = "swagger";
-});
+    app.MapOpenApi();
+    app.UseSwaggerUI(o =>
+    {
+        o.SwaggerEndpoint("/openapi/v1.json", "磐石 API");
+        o.RoutePrefix = "swagger";
+    });
+}
 
 // 入口 HTML 强制协商缓存：避免浏览器缓存旧 index.html（引用已失效的 hash 资源）导致白屏。
 // /assets 带内容 hash 可长缓存；HTML 一律 no-cache（见下方 StaticFileOptions.OnPrepareResponse）。
@@ -274,7 +280,13 @@ app.MapFallback(async ctx =>
     else
         ctx.Response.StatusCode = StatusCodes.Status404NotFound;
 });
+// 存活：进程能应答即 200（容器 HEALTHCHECK 打这条——查依赖会让库抖动时 API 被反复判死重启）
 app.MapHealthChecks("/api/v1/health");
+// 就绪：真的问一次数据库，供反代/编排摘流量与人工排障
+app.MapHealthChecks("/api/v1/health/ready", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
+{
+    Predicate = r => r.Tags.Contains("ready")
+});
 
 // —— 启动数据库引导（等待 PG 就绪 → 逐表 CodeFirst → 迁移 → 种子）——
 using (var scope = app.Services.CreateAsyncScope())

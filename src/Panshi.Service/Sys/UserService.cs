@@ -1,6 +1,7 @@
 using System.Linq.Expressions;
 using MiniExcelLibs;
 using Panshi.Common.Exceptions;
+using Panshi.Common.Realtime;
 using Panshi.Common.Results;
 using Panshi.Common.Security;
 using Panshi.Model.Dtos;
@@ -23,8 +24,10 @@ public class UserService(
     IRepository<SysUserPosition> userPosRepo,
     IRepository<SysRole> roleRepo,
     IRepository<SysDept> deptRepo,
+    IRepository<SysUserSession> sessionRepo,
     ConfigService config,
-    DataScopeService dataScope) : BaseService<SysUser>(userRepo)
+    DataScopeService dataScope,
+    INotifyService notify) : BaseService<SysUser>(userRepo)
 {
     public const string AdminName = AuthService.AdminUserName;
 
@@ -193,6 +196,16 @@ public class UserService(
         user.PwdUpdateTime = DateTime.Now;
         user.MustChangePassword = true; // 重置为共享初始密码 → 强制该用户下次登录改密
         await Repo.UpdateColumnsAsync(user, "Password", "PwdUpdateTime", "MustChangePassword");
+
+        // 旧令牌必须一起作废：只换口令不下线会话，被盗用的那一端还能靠 refresh 续到 7 天，
+        // 「重置」就只挡住了受害者。自助改密那边同理（见 AuthService.ChangePasswordAsync）。
+        if (await sessionRepo.ExistsAsync(s => s.UserId == id))
+        {
+            await sessionRepo.DeleteAsync(s => s.UserId == id);
+            await notify.NotifyUserAsync(id, "密码已被管理员重置",
+                "你的密码已被管理员重置，全部登录会话已失效，请用新初始密码登录后立即修改。");
+        }
+
         return pwd;
     }
 

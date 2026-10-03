@@ -14,6 +14,9 @@ namespace Panshi.Api.Middleware;
 /// </summary>
 public static class AuthSetup
 {
+    /// <summary>OnTokenValidated 决定拒绝时，把给用户看的原因放这儿，OnChallenge 取用。</summary>
+    private const string AuthFailReasonKey = "AuthFailReason";
+
     public static void AddPanshiAuth(this IServiceCollection services, IConfiguration config)
     {
         var authOptions = config.GetSection("Jwt").Get<Service.Auth.AuthOptions>()
@@ -59,6 +62,15 @@ public static class AuthSetup
                             return;
                         }
 
+                        // 强制改密不能只靠前端路由拦：手搓请求或旧标签页照样能调业务接口。
+                        // 拦下时把原因留在 Items 里，OnChallenge 才知道该回哪句话。
+                        if (await auth.MustChangePasswordAsync(user) && !PasswordGate.Allows(ctx.HttpContext.Request.Path))
+                        {
+                            ctx.HttpContext.Items[AuthFailReasonKey] = "请先修改初始密码或已过期密码";
+                            ctx.Fail("密码必须更换");
+                            return;
+                        }
+
                         ctx.HttpContext.Items["SessionUser"] = user;
                     },
                     OnChallenge = async ctx =>
@@ -68,7 +80,8 @@ public static class AuthSetup
                         ctx.Response.StatusCode = StatusCodes.Status401Unauthorized;
                         ctx.Response.ContentType = "application/json; charset=utf-8";
                         await ctx.Response.WriteAsync(JsonSerializer.Serialize(
-                            ApiResult.Fail(401, "登录状态已失效，请重新登录"), JsonConfig.Options));
+                            ApiResult.Fail(401, ctx.HttpContext.Items[AuthFailReasonKey] as string
+                                               ?? "登录状态已失效，请重新登录"), JsonConfig.Options));
                     },
                     OnForbidden = async ctx =>
                     {
@@ -112,4 +125,23 @@ public static class AuthSetup
 public static class AuthClaimTypes
 {
     public const string Dept = "dept";
+}
+
+/// <summary>
+/// 密码被判定「必须先改」时仍然放行的端点——改密页要用的那几条，一条都不多给。
+/// ⚠️ 用 StartsWithSegments 而不是 StartsWith：后者会让 <c>/api/v1/profile-x</c> 这类同前缀路径混进来。
+/// refresh 必须在列内，否则前端在改密页上换不出新令牌，会被踢回收页反复登录。
+/// </summary>
+public static class PasswordGate
+{
+    private static readonly string[] AllowedWhileBlocked =
+    [
+        "/api/v1/auth/change-password",
+        "/api/v1/auth/profile",
+        "/api/v1/auth/refresh",
+        "/api/v1/auth/logout"
+    ];
+
+    public static bool Allows(PathString path) =>
+        AllowedWhileBlocked.Any(p => path.StartsWithSegments(p));
 }

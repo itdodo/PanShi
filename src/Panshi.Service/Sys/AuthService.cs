@@ -302,7 +302,11 @@ public class AuthService(
         }
     }
 
-    private async Task<bool> MustChangePasswordAsync(SysUser user)
+    /// <summary>
+    /// 「这个账号现在必须先改密码吗」——登录回给前端只是提示，真正的拦在请求管道里
+    /// （AuthSetup 的 OnTokenValidated 每条请求都问一次），否则手搓请求就绕过了。
+    /// </summary>
+    public async Task<bool> MustChangePasswordAsync(SysUser user)
     {
         if (user.MustChangePassword) return true; // 新建/重置/导入后的首登强制改密
         var days = await config.GetIntAsync("sys.pwd.expireDays", 90);

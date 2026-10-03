@@ -13,18 +13,27 @@ namespace Panshi.Api.Filters;
 /// <summary>
 /// 操作日志全局过滤器（蓝图§5.5）：自动记录全部 POST/PUT/DELETE/PATCH；
 /// 参数脱敏（password/secret/token/credential 词根）+ 耗时 + IP + 成败/错误。
-/// 登录接口不记（由 sys_login_log 专表）。
 /// </summary>
 public class OperationLogFilter(ISqlSugarClient db) : IAsyncActionFilter
 {
     private static readonly string[] TrackedMethods = ["POST", "PUT", "DELETE", "PATCH"];
+
+    /// <summary>
+    /// 只豁免这三条：登录/刷新已经进 sys_login_log 专表，验证码没有主体。
+    /// ⚠️ 别整段豁免 /api/v1/auth——那等于「自助改密不留痕」，账号被接管时定位不到改密时点。
+    /// </summary>
+    private static readonly string[] UntrackedPaths =
+    [
+        "/api/v1/auth/login", "/api/v1/auth/refresh", "/api/v1/auth/captcha"
+    ];
 
     private const string StartKey = "__oplog_start";
 
     public async Task OnActionExecutionAsync(ActionExecutingContext context, ActionExecutionDelegate next)
     {
         var request = context.HttpContext.Request;
-        if (!TrackedMethods.Contains(request.Method) || request.Path.StartsWithSegments("/api/v1/auth"))
+        if (!TrackedMethods.Contains(request.Method) ||
+            UntrackedPaths.Any(p => request.Path.StartsWithSegments(p)))
         {
             await next();
             return;

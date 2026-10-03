@@ -186,7 +186,7 @@ public class PgFixture : IAsyncLifetime
 
     public UserService UserService()
         => new(Repo<SysUser>(), Repo<SysUserRole>(), Repo<SysUserPosition>(), Repo<SysRole>(), Repo<SysDept>(),
-            Config(), DataScope());
+            Repo<SysUserSession>(), Config(), DataScope(), Notify);
 
     /// <summary>按给定开关装配一个 IP 名单服务（DryRun / 受信代理都可在测试里模拟）。</summary>
     public IpGuardService IpGuard(bool dryRun = false, string[]? trustedProxies = null)

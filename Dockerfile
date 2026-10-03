@@ -36,4 +36,8 @@ COPY --from=web-build /src/web/dist ./wwwroot
 RUN mkdir -p /app/uploads /app/logs
 ENV TZ=Asia/Shanghai
 EXPOSE 8080
+# 存活探针：只问进程答不答（查依赖会让库抖动把 API 反复判死重启）；就绪看 /api/v1/health/ready。
+# start-period 给足——启动引导会等 PG 就绪，最长 24×5s。curl 是上面装 PGDG 时已经进镜像的。
+HEALTHCHECK --interval=30s --timeout=5s --start-period=150s --retries=3 \
+    CMD curl -fsS http://127.0.0.1:8080/api/v1/health || exit 1
 ENTRYPOINT ["dotnet", "Panshi.Api.dll"]

@@ -94,6 +94,31 @@ public class MustChangePasswordTests(PgFixture fx) : PgTestBase(fx)
     }
 
     [Fact]
+    public async Task ResetPassword_Kills_Target_Sessions_And_Notifies()
+    {
+        var uname = NewUname();
+        var uid = await CreateAsync(new UserCreateDto
+        {
+            UserName = uname, NickName = "重置下线", Password = ExplicitPw(), DeptId = 3, Status = EnableStatus.Enabled
+        });
+        try
+        {
+            Login(uname, ExplicitPw()); // 造一条真实会话（含 refresh 令牌）
+            Assert.True(await Db.Queryable<SysUserSession>().AnyAsync(s => s.UserId == uid));
+
+            await Fx.UserService().ResetPasswordAsync(uid);
+
+            // 只换口令不下线会话 = 被盗用的那一端还能靠 refresh 续到 7 天
+            Assert.False(await Db.Queryable<SysUserSession>().AnyAsync(s => s.UserId == uid));
+            Assert.Contains(Fx.Notify.Notices, n => n.Uid == uid && n.Title.Contains("重置"));
+        }
+        finally
+        {
+            await CleanupAsync(uid);
+        }
+    }
+
+    [Fact]
     public async Task ResetPassword_Forces_Change_On_Next_Login()
     {
         var uname = NewUname();
