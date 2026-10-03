@@ -166,6 +166,12 @@ public class StockDocService(
         var bizTime = DateTime.Now;
         await Tran.RunAsync(Repo.Db, async () =>
         {
+            // 先抢状态再动库存：抢不到说明别人已经过账/作废，此时若继续扣减就是记两遍账。
+            // 锁顺序统一成「单据行 → 库存行」，与作废路径一致，不会互相绕成死锁。
+            doc.Version = await ClaimStatusAsync(doc.Id, StockDocStatus.Draft, StockDocStatus.Posted, bizTime);
+            doc.Status = StockDocStatus.Posted;
+            doc.PostedTime = bizTime;
+
             foreach (var line in lines)
             {
                 var delta = doc.Kind switch
@@ -177,10 +183,6 @@ public class StockDocService(
                 if (doc.Kind == StockDocKind.Transfer && doc.TargetWarehouseId is { } targetId)
                     await MoveAsync(targetId, doc.TargetWarehouseName ?? "", line, line.Quantity, doc, bizTime, userName);
             }
-
-            doc.Status = StockDocStatus.Posted;
-            doc.PostedTime = bizTime;
-            await Repo.UpdateColumnsAsync(doc, "Status", "PostedTime");
         });
 
         return ToDto(doc);
@@ -202,16 +204,37 @@ public class StockDocService(
         var bizTime = DateTime.Now;
         await Tran.RunAsync(Repo.Db, async () =>
         {
+            // 与过账同一套抢状态：并发点两次作废只会冲销一次（PostedTime 保持不动，靠 Status 区分）
+            doc.Version = await ClaimStatusAsync(doc.Id, StockDocStatus.Posted, StockDocStatus.Void);
+            doc.Status = StockDocStatus.Void;
+
             foreach (var entry in entries.OrderBy(l => l.Id))
             {
                 var line = new ResolvedStockLine(entry.MaterialId, entry.MaterialCode, entry.MaterialName, entry.Unit);
                 await MoveAsync(entry.WarehouseId, entry.WarehouseName, line, -entry.ChangeQty, doc, bizTime, userName);
             }
-            doc.Status = StockDocStatus.Void;
-            await Repo.UpdateColumnsAsync(doc, "Status");
         });
 
         return ToDto(doc);
+    }
+
+    /// <summary>
+    /// 状态流转的唯一入口：UPDATE 带「当前状态必须等于 from」的守卫，返回新版本号；
+    /// 0 行 = 这张单已被别人改过状态（重复点击、或另一个人先过了一步）→ 409 让前端刷新。
+    /// ⚠️ 别退回「先读出来判一下、再按主键写 status」：两个请求会双双通过判断、各记一遍账，
+    /// 由 ConcurrencyTests 的「同单并发过账/并发作废」两条用例钉住。
+    /// </summary>
+    private async Task<int> ClaimStatusAsync(long docId, StockDocStatus from, StockDocStatus to,
+        DateTime? postedTime = null)
+    {
+        var versions = await Repo.Db.Ado.SqlQueryAsync<int>(
+            "update scm_stock_doc set status = @to, version = version + 1, update_time = now()"
+            + (postedTime is null ? "" : ", posted_time = @postedTime")
+            + " where id = @docId and status = @from and is_deleted = false returning version",
+            new { docId, from = (int)from, to = (int)to, postedTime });
+        if (versions.Count == 0)
+            throw BizException.Conflict("该单据状态已变化（可能已被他人过账或作废），请刷新后重试");
+        return versions[0];
     }
 
     /* -------------------------------- 过账内核 -------------------------------- */

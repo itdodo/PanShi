@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Panshi.Api.Authorization;
+using Panshi.Api.Filters;
 using Panshi.Api.Middleware;
 using Panshi.Common.Results;
 using Panshi.Model.Dtos;
@@ -44,6 +45,7 @@ public class PurchaseOrderController(PurchaseOrderService orders) : ApiControlle
 
     [HttpPost("{id:long}/submit")]
     [HasPermission("scm:purchase:submit")]
+    [NoRepeatSubmit]
     public async Task<PurchaseOrderDto> Submit(long id, [FromBody] FlowSubmitDto payload)
         => await orders.SubmitAsync(id, Uid, Name, payload);
 }
@@ -81,6 +83,7 @@ public class SalesOrderController(SalesOrderService orders) : ApiControllerBase
 
     [HttpPost("{id:long}/submit")]
     [HasPermission("scm:sales:submit")]
+    [NoRepeatSubmit]
     public async Task<SalesOrderDto> Submit(long id, [FromBody] FlowSubmitDto payload)
         => await orders.SubmitAsync(id, Uid, Name, payload);
 }

@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Panshi.Api.Authorization;
+using Panshi.Api.Filters;
 using Panshi.Api.Middleware;
 using Panshi.Common.Results;
 using Panshi.Model.Dtos;
@@ -44,10 +45,12 @@ public class StockDocController(StockDocService docs) : ApiControllerBase
 
     [HttpPost("{id:long}/post")]
     [HasPermission("scm:stockdoc:post")]
+    [NoRepeatSubmit]
     public async Task<StockDocDto> Post(long id) => await docs.PostAsync(id, Uid, Name);
 
     [HttpPost("{id:long}/void")]
     [HasPermission("scm:stockdoc:post")]
+    [NoRepeatSubmit]
     public async Task<StockDocDto> Void(long id) => await docs.VoidAsync(id, Uid, Name);
 }
 

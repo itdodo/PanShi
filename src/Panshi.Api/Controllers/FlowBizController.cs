@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Panshi.Api.Authorization;
+using Panshi.Api.Filters;
 using Panshi.Api.Middleware;
 using Panshi.Common.Results;
 using Panshi.Service.Biz;
@@ -77,19 +78,24 @@ public class FlowController(
     public async Task<PagedResult<FlowTaskDto>> Done([FromQuery] FlowTaskQuery q) => await query.DonePageAsync(Uid, q);
 
     [HttpPost("task/{id:long}/act")]
+    [NoRepeatSubmit]
     public async Task Act(long id, [FromBody] FlowActDto dto) => await engine.HandleAsync(id, dto, Uid, Name);
 
     [HttpPost("task/{id:long}/return")]
+    [NoRepeatSubmit]
     public async Task Return(long id, [FromBody] FlowReturnDto dto) => await engine.ReturnAsync(id, dto, Uid, Name);
 
     [HttpPost("task/{id:long}/transfer")]
+    [NoRepeatSubmit]
     public async Task Transfer(long id, [FromBody] FlowTransferDto dto) => await engine.TransferAsync(id, dto, Uid, Name);
 
     [HttpPost("task/{id:long}/addsign")]
+    [NoRepeatSubmit]
     public async Task AddSign(long id, [FromBody] FlowAddSignDto dto) => await engine.AddSignAsync(id, dto, Uid, Name);
 
     // ---------------- 实例 ----------------
     [HttpPost("submit")]
+    [NoRepeatSubmit]
     public async Task<ApiResult<string>> Submit([FromBody] FlowSubmitDto dto)
     {
         var id = await engine.SubmitAsync(dto, Uid, Name);
@@ -166,6 +172,7 @@ public class BizController(ExpenseService expenses, PurchaseService purchases) :
 
     [HttpPost("expense/{id:long}/submit")]
     [HasPermission("biz:expense:submit")]
+    [NoRepeatSubmit]
     public async Task<ExpenseDto> ExpenseSubmit(long id, [FromBody] FlowSubmitDto payload)
         => await expenses.SubmitAsync(id, Uid, Name, payload);
 
@@ -192,6 +199,7 @@ public class BizController(ExpenseService expenses, PurchaseService purchases) :
 
     [HttpPost("purchase/{id:long}/submit")]
     [HasPermission("biz:purchase:submit")]
+    [NoRepeatSubmit]
     public async Task<PurchaseDto> PurchaseSubmit(long id, [FromBody] FlowSubmitDto payload)
         => await purchases.SubmitAsync(id, Uid, Name, payload);
 }
