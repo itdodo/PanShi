@@ -1,0 +1,72 @@
+name: CI
+
+# 门禁定义只有一份：本地和 CI 跑的都是 scripts/verify.sh 的五步
+# （后端编译 / 单元测试 / 集成测试 / 前端类型检查 / 前端构建）。
+# 之前 vue-tsc 红着被 vite build 掩盖着跑了很多次，就是这个脚本存在的理由——所以别再另起一套 yml 里的步骤。
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: 五步验收
+    runs-on: ubuntu-latest
+    env:
+      DOTNET_CLI_UI_LANGUAGE: en
+      # 集成测试连的是一个**空库**：fixture 会走完整引导（CodeFirst 建表 → 12 条迁移 → 种子），
+      # 于是每次 CI 都顺带证明「全新库能起来」，不用另外跑引导探针。
+      PANSHI_TEST_CONN: "Host=localhost;Port=5432;Database=panshi_test;Username=panshi;Password=ci_panshi;Pooling=true;Maximum Pool Size=50"
+    services:
+      pg:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: panshi
+          POSTGRES_PASSWORD: ci_panshi
+          POSTGRES_DB: panshi_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U panshi -d panshi_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'                 # 与 Dockerfile 的 node:22-alpine 对齐
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: 安装前端依赖
+        run: npm ci --no-audit --no-fund
+        working-directory: web
+
+      - name: 跑 verify.sh
+        run: bash scripts/verify.sh
+
+      # 只报不拦：传递性公告常常要等上游修，卡住只会逼人往 main 上 --skip-ci
+      - name: 依赖漏洞扫描（非阻断）
+        continue-on-error: true
+        run: |
+          for p in src/*/*.csproj tests/*/*.csproj; do
+            out=$(dotnet list "$p" package --vulnerable --include-transitive 2>/dev/null | grep -iE "critical|high" || true)
+            [ -n "$out" ] && echo "[$p] $out"
+          done
+          ( cd web && npm audit --audit-level=high ) || true
+          echo "漏洞扫描结束（以上为提示，不影响本流水线结论）"

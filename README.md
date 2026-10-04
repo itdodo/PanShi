@@ -77,6 +77,15 @@ bash scripts/verify.sh --fast   # 跳过集成测试那一步
 
 任何一步红就退出码非 0，并指名是哪一步。**别带着红的步骤去 build 镜像。**
 「前端构建」这一步偶发过一次原因未明的失败，所以给它一次重试：重试成功会打 `⚠` 并留下日志路径（偶发可容忍，但不许无声）；重试仍失败则把输出末尾打出来。
+
+CI（`.github/workflows/ci.yml`）跑的就是这同一条命令——门禁只有一份定义，不在 yml 里另起一套步骤。
+它起一个 `postgres:17-alpine` 服务容器并把 `PANSHI_TEST_CONN` 指向一个**空库**，于是每次推送都顺带验证「全新库能完整引导」（CodeFirst 建表 → 迁移 → 种子）。本地想复现同样的条件：
+
+```bash
+docker exec -i panshi-db psql -U panshi -d postgres -c "CREATE DATABASE panshi_ci OWNER panshi"
+PANSHI_TEST_CONN="Host=localhost;Port=5432;Database=panshi_ci;Username=panshi;Password=<.env 里的值>;Pooling=true" bash scripts/verify.sh
+docker exec -i panshi-db psql -U panshi -d postgres -c "DROP DATABASE panshi_ci"
+```
 `--fast` 之外还会在 `panshi-db` 没起时直接报错提示，而不是把集成测试静默跑成一片红。
 
 > 为什么单独强调「前端类型检查」：`vite build` 不做类型检查，所以类型错误可以让构建一路绿着过去。

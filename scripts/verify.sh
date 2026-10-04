@@ -58,7 +58,8 @@ stop_at_first_failure() {
 # 1) 后端编译。0 警告是本仓库的既有基线（CS1591 已被 Directory.Build.props 有意压掉），
 #    所以这里只卡错误，但把警告数打出来——它变多了就该看一眼。
 build_backend() {
-  dotnet build Panshi.slnx --nologo | grep -E "个警告|个错误"
+  # 计数行按语言两种写法都认：CI 上 DOTNET_CLI_UI_LANGUAGE=en，输出是 "0 Warning(s)"
+  dotnet build Panshi.slnx --nologo | grep -E "个警告|个错误|Warning\(s\)|Error\(s\)"
   return "${PIPESTATUS[0]}"
 }
 step "后端编译" build_backend
@@ -71,11 +72,13 @@ if [ "$FAST" = "--fast" ]; then
   echo "⏭  --fast：跳过集成测试（需要 panshi-db 在跑）"
 else
   # 3) 集成测试跑真实 PG。两个 csproj 必须一个一个跑——并行会撞 dll 文件锁。
-  if ! docker ps --format '{{.Names}}' 2>/dev/null | grep -q '^panshi-db$'; then
-    printf '\n✘ 集成测试需要数据库：先 `docker compose up -d panshi-db`，或用 --fast 跳过。\n'
-    FAILED=1
-  else
+  # 数据库从哪来：本机是 compose 起的 panshi-db 容器；CI 用服务容器 + PANSHI_TEST_CONN 自证，
+  # 这时再要求「有个叫 panshi-db 的容器」就是门禁自己造的假阴性。
+  if [ -n "${PANSHI_TEST_CONN:-}" ] || docker ps --format '{{.Names}}' 2>/dev/null | grep -q '^panshi-db$'; then
     step "集成测试（真实 PG）" dotnet test tests/Panshi.IntegrationTests/Panshi.IntegrationTests.csproj --nologo -v q
+  else
+    printf '\n✘ 集成测试需要数据库：先 `docker compose up -d panshi-db`，或设 PANSHI_TEST_CONN，或用 --fast 跳过。\n'
+    FAILED=1
   fi
 fi
 
