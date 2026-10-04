@@ -33,28 +33,36 @@ fi
 RUNS_API="https://api.github.com/repos/${REPO}/actions/runs?head_sha=${SHA}"
 CHECK_API="https://api.github.com/repos/${REPO}/commits/${SHA}/check-runs"
 
-# 排队 → 登记之间可能有好几分钟空窗（实测 push 后 2 分钟仍查不到 run 对象），所以给一个宽窗口。
-# 问 runs 而不是只问 check-runs：后者要等 job 真正起跑才有内容，把它当「没触发」会误报。
+# 排队 → 登记之间有几秒到几十秒空窗，给一个短窗口即可（别拿它当「没触发」的证据）。
+# 问 runs 而不是只问 check-runs：后者要等 job 真正起跑才有内容。
+# ⚠️ GitHub REST 返回的是**冒号后带空格**的 pretty JSON（"total_count": 1），
+#    所以所有模式都必须容忍冒号后的空白——用紧凑 JSON 的写法会永远匹配不上，
+#    表现是「明明跑绿了却报没触发」，而且看着像 GitHub 的锅。
+count_of() { printf '%s' "$1" | grep -oE "\"$2\"[[:space:]]*:[[:space:]]*[0-9]+" | head -1 | grep -oE '[0-9]+$'; }
+
 SEEN_RUN=0
-for attempt in $(seq 1 12); do
+for attempt in 1 2 3 4; do
   RUNS=$(curl -sf --max-time 30 "$RUNS_API") || { echo "✘ 查不到 ${REPO}@${SHA:0:7} 的运行记录（网络？私有库需带 token？）"; exit 2; }
-  if printf '%s' "$RUNS" | grep -qE '"status":"(queued|in_progress)"'; then
+  if printf '%s' "$RUNS" | grep -qE '"status"[[:space:]]*:[[:space:]]*"(queued|in_progress)"'; then
     echo "… CI 还在排队/执行（${SHA:0:7}），等它结束再构建。"
     exit 2
   fi
-  printf '%s' "$RUNS" | grep -q '"total_count":[1-9]' && { SEEN_RUN=1; break; }
-  if [ "$attempt" = "12" ]; then break; fi
-  [ $((attempt % 3)) = 0 ] && echo "… 还没有 ${SHA:0:7} 的运行记录（已等 $((attempt * 20)) 秒，GitHub 排队可能较慢）"
-  sleep 20
+  RUN_TOTAL=$(count_of "$RUNS" total_count)
+  [ -n "$RUN_TOTAL" ] && [ "$RUN_TOTAL" != "0" ] && { SEEN_RUN=1; break; }
+  [ "$attempt" = "4" ] || { echo "… 还没有 ${SHA:0:7} 的运行记录，15 秒后重试（$attempt/4）"; sleep 15; }
 done
 if [ "$SEEN_RUN" = "0" ]; then
-  echo "✘ 等了 4 分钟，origin 上的 ${SHA:0:7} 仍没有任何工作流运行记录。两种可能：排队异常久，或根本没被触发"
+  echo "✘ origin 上有 ${SHA:0:7}，但等了一分钟仍没有任何工作流运行记录 → 大概率没被触发"
   echo "  （分支不在 on: 里？Actions 被禁用？workflow 权限不足？）。去 Actions 页确认后再构建，别硬上。"
   exit 2
 fi
 
 JSON=$(curl -sf --max-time 30 "$CHECK_API") || { echo "✘ 读 check-runs 失败（${SHA:0:7}）"; exit 2; }
-CONCLUSIONS=$(printf '%s' "$JSON" | grep -o '"conclusion":[^,}]*' | sed 's/"conclusion"://' | sort | uniq -c)
+CONCLUSIONS=$(printf '%s' "$JSON" | grep -oE '"conclusion"[[:space:]]*:[[:space:]]*[^,}]*' | sed -E 's/.*:[[:space:]]*//' | sort | uniq -c)
+if [ -z "$CONCLUSIONS" ]; then
+  echo "✘ 运行记录有了，但 check-runs 里没有任何结论（${SHA:0:7}）——去 Actions 页看一眼再构建。"
+  exit 2
+fi
 if printf '%s' "$CONCLUSIONS" | grep -q 'null'; then
   echo "… 运行已结束但检查结论还没落定（${SHA:0:7}），稍后再试。当前：$(printf '%s' "$CONCLUSIONS" | tr '\n' ' ')"
   exit 2
