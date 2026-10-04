@@ -5,6 +5,7 @@
 # 所以 CI 红了也照样能把镜像推上 18080——门禁等于只跑了给人看。脚本把「CI 绿」变成构建前的条件。
 #
 # 用法：bash scripts/prebuild-check.sh        # 0=可以构建；1=CI 红；2=判不了（先按提示处理）
+#       GITHUB_TOKEN=<pat> bash scripts/prebuild-check.sh   # 避开匿名 60 次/小时配额
 # 只用 curl + grep：Git Bash 与 ubuntu runner 都能跑，不依赖 jq/python。
 set -uo pipefail
 
@@ -33,6 +34,28 @@ fi
 RUNS_API="https://api.github.com/repos/${REPO}/actions/runs?head_sha=${SHA}"
 CHECK_API="https://api.github.com/repos/${REPO}/commits/${SHA}/check-runs"
 
+# 未带 token 的 REST 配额只有 60 次/小时（共享出口 IP 更容易撞），所以支持 GITHUB_TOKEN；
+# 失败时把 HTTP 码分诊清楚——把「限流」报成「工作流没被触发」会把人支到完全错的方向。
+AUTH=()
+[ -n "${GITHUB_TOKEN:-}" ] && AUTH=(-H "Authorization: Bearer ${GITHUB_TOKEN}" -H "Accept: application/vnd.github+json")
+
+ap_get() {
+  local out code
+  out=$(curl -s --max-time 30 ${AUTH[@]+"${AUTH[@]}"} -w '\n%{http_code}' "$1") \
+    || { echo "✘ 请求打不出去（网络/代理）：$1"; return 2; }
+  code=${out##*$'\n'}
+  if [ "$code" != "200" ]; then
+    case "$code" in
+      401|403) echo "✘ GitHub API 鉴权或限流（HTTP $code）。匿名只有 60 次/小时；设 GITHUB_TOKEN=<pat> 再跑，或等配额恢复。" ;;
+      404)     echo "✘ HTTP 404：${REPO}@${SHA:0:7} 查不到——仓库改名/转私有，或这个 sha 不在远端？" ;;
+      000)     echo "✘ 请求超时，没拿到响应：$1" ;;
+      *)       echo "✘ GitHub API 返回 HTTP $code：$1" ;;
+    esac
+    return 2
+  fi
+  printf '%s' "${out%$'\n'*}"
+}
+
 # 排队 → 登记之间有几秒到几十秒空窗，给一个短窗口即可（别拿它当「没触发」的证据）。
 # 问 runs 而不是只问 check-runs：后者要等 job 真正起跑才有内容。
 # ⚠️ GitHub REST 返回的是**冒号后带空格**的 pretty JSON（"total_count": 1），
@@ -42,7 +65,7 @@ count_of() { printf '%s' "$1" | grep -oE "\"$2\"[[:space:]]*:[[:space:]]*[0-9]+"
 
 SEEN_RUN=0
 for attempt in 1 2 3 4; do
-  RUNS=$(curl -sf --max-time 30 "$RUNS_API") || { echo "✘ 查不到 ${REPO}@${SHA:0:7} 的运行记录（网络？私有库需带 token？）"; exit 2; }
+  RUNS=$(ap_get "$RUNS_API") || exit 2
   if printf '%s' "$RUNS" | grep -qE '"status"[[:space:]]*:[[:space:]]*"(queued|in_progress)"'; then
     echo "… CI 还在排队/执行（${SHA:0:7}），等它结束再构建。"
     exit 2
@@ -57,7 +80,7 @@ if [ "$SEEN_RUN" = "0" ]; then
   exit 2
 fi
 
-JSON=$(curl -sf --max-time 30 "$CHECK_API") || { echo "✘ 读 check-runs 失败（${SHA:0:7}）"; exit 2; }
+JSON=$(ap_get "$CHECK_API") || exit 2
 CONCLUSIONS=$(printf '%s' "$JSON" | grep -oE '"conclusion"[[:space:]]*:[[:space:]]*[^,}]*' | sed -E 's/.*:[[:space:]]*//' | sort | uniq -c)
 if [ -z "$CONCLUSIONS" ]; then
   echo "✘ 运行记录有了，但 check-runs 里没有任何结论（${SHA:0:7}）——去 Actions 页看一眼再构建。"
