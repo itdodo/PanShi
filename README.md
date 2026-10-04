@@ -1,5 +1,7 @@
 # Panshi — 企业级单机管理中后台底座
 
+[![CI](https://github.com/itdodo/PanShi/actions/workflows/ci.yml/badge.svg)](https://github.com/itdodo/PanShi/actions/workflows/ci.yml)
+
 .NET 10 + PostgreSQL 17 + Vue 3.5 + **Naive UI** 的完整后台框架：认证与会话治理、RBAC（角色管菜单权限 / 岗位管审批权限）、部门数据权限五档、钉钉式审批流引擎（可视化 DSL、会签/或签/依次/条件分支/驳回/加签/抄送）、审计三件套（操作/登录/字段级变更）、站内信 + SignalR 实时、定时任务 + 每日自动备份、报销单/采购申请单业务样板。
 
 - 重建规范：`docs/框架蓝图.md`
@@ -77,6 +79,14 @@ bash scripts/verify.sh --fast   # 跳过集成测试那一步
 
 任何一步红就退出码非 0，并指名是哪一步。**别带着红的步骤去 build 镜像。**
 「前端构建」这一步偶发过一次原因未明的失败，所以给它一次重试：重试成功会打 `⚠` 并留下日志路径（偶发可容忍，但不许无声）；重试仍失败则把输出末尾打出来。
+
+部署动作是手工 `docker compose build`，没有 PR 合并那道门——所以构建前先问一句 CI 绿了没：
+
+```bash
+bash scripts/prebuild-check.sh   # 退出码 0 才该继续构建
+```
+
+它按 `origin` 上的 sha 查 GitHub 检查结论：工作区脏 / 还没 push / CI 在跑 → 2（并说明原因），CI 不全绿 → 1，全绿 → 0。
 
 CI（`.github/workflows/ci.yml`）跑的就是这同一条命令——门禁只有一份定义，不在 yml 里另起一套步骤。
 它起一个 `postgres:17-alpine` 服务容器并把 `PANSHI_TEST_CONN` 指向一个**空库**，于是每次推送都顺带验证「全新库能完整引导」（CodeFirst 建表 → 迁移 → 种子）。本地想复现同样的条件：
