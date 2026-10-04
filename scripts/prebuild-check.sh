@@ -33,21 +33,23 @@ fi
 RUNS_API="https://api.github.com/repos/${REPO}/actions/runs?head_sha=${SHA}"
 CHECK_API="https://api.github.com/repos/${REPO}/commits/${SHA}/check-runs"
 
-# 排队 → 登记之间可能有几分钟空窗，所以给一个有界观察窗口。
+# 排队 → 登记之间可能有好几分钟空窗（实测 push 后 2 分钟仍查不到 run 对象），所以给一个宽窗口。
 # 问 runs 而不是只问 check-runs：后者要等 job 真正起跑才有内容，把它当「没触发」会误报。
 SEEN_RUN=0
-for attempt in 1 2 3 4 5 6; do
+for attempt in $(seq 1 12); do
   RUNS=$(curl -sf --max-time 30 "$RUNS_API") || { echo "✘ 查不到 ${REPO}@${SHA:0:7} 的运行记录（网络？私有库需带 token？）"; exit 2; }
   if printf '%s' "$RUNS" | grep -qE '"status":"(queued|in_progress)"'; then
     echo "… CI 还在排队/执行（${SHA:0:7}），等它结束再构建。"
     exit 2
   fi
   printf '%s' "$RUNS" | grep -q '"total_count":[1-9]' && { SEEN_RUN=1; break; }
-  [ "$attempt" = "6" ] || sleep 20
+  if [ "$attempt" = "12" ]; then break; fi
+  [ $((attempt % 3)) = 0 ] && echo "… 还没有 ${SHA:0:7} 的运行记录（已等 $((attempt * 20)) 秒，GitHub 排队可能较慢）"
+  sleep 20
 done
 if [ "$SEEN_RUN" = "0" ]; then
-  echo "✘ origin 上有 ${SHA:0:7}，但 GitHub 两分钟内一个工作流运行都没有 → 大概率没被触发"
-  echo "  （分支不在 on: 里？Actions 被禁用？仓库设置里 workflow 权限不足？）确认后再构建。"
+  echo "✘ 等了 4 分钟，origin 上的 ${SHA:0:7} 仍没有任何工作流运行记录。两种可能：排队异常久，或根本没被触发"
+  echo "  （分支不在 on: 里？Actions 被禁用？workflow 权限不足？）。去 Actions 页确认后再构建，别硬上。"
   exit 2
 fi
 
