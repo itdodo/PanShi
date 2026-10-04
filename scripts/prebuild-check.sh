@@ -24,8 +24,10 @@ REMOTE_URL=$(git remote get-url origin 2>/dev/null) || { echo "✘ 没有 origin
 REPO=$(printf '%s' "$REMOTE_URL" | sed -E 's#.*github\.com[:/]##; s#\.git$##')
 SHA=$(git rev-parse HEAD)
 
-# 先分清「没 push」和「push 了但流水线还没登记」——两者的处置完全不同
-if ! git branch -r --contains "$SHA" >/dev/null 2>&1; then
+# 先分清「没 push」和「push 了但流水线还没登记」——两者的处置完全不同。
+# ⚠️ 判据必须是输出而不是退出码：git branch -r --contains 对「本地有、远端没有」的提交
+# 是打印空 + 退出码 0，拿退出码判断会永远走不到这一支。
+if [ -z "$(git branch -r --contains "$SHA" 2>/dev/null)" ]; then
   echo "✘ 这个提交还没 push 到 origin：${SHA:0:7}。CI 只在远端跑，先 push 才有结论可查。"
   exit 2
 fi
