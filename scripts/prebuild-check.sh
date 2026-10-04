@@ -4,15 +4,13 @@
 # 为什么要有它：这个仓库的部署动作是「手工 docker compose build + up -d」，没有 PR 合并那道门，
 # 所以 CI 红了也照样能把镜像推上 18080——门禁等于只跑了给人看。脚本把「CI 绿」变成构建前的条件。
 #
-# 用法：bash scripts/prebuild-check.sh        # 通过=0，可以 build；不通过=非 0，并说明为什么
+# 用法：bash scripts/prebuild-check.sh        # 0=可以构建；1=CI 红；2=判不了（先按提示处理）
+# 只用 curl + grep：Git Bash 与 ubuntu runner 都能跑，不依赖 jq/python。
 set -uo pipefail
 
 cd "$(dirname "$0")/.." || exit 2
 
-if ! git rev-parse --verify HEAD >/dev/null 2>&1; then
-  echo "✘ 仓库还没有任何提交"
-  exit 2
-fi
+git rev-parse --verify HEAD >/dev/null 2>&1 || { echo "✘ 仓库还没有任何提交"; exit 2; }
 
 # 工作区脏 → CI 跑的根本不是这份代码，结论无意义
 if [ -n "$(git status --porcelain)" ]; then
@@ -24,7 +22,7 @@ REMOTE_URL=$(git remote get-url origin 2>/dev/null) || { echo "✘ 没有 origin
 REPO=$(printf '%s' "$REMOTE_URL" | sed -E 's#.*github\.com[:/]##; s#\.git$##')
 SHA=$(git rev-parse HEAD)
 
-# 先分清「没 push」和「push 了但流水线还没登记」——两者的处置完全不同。
+# 先分清「没 push」和「push 了但流水线还没登记」——处置完全不同。
 # ⚠️ 判据必须是输出而不是退出码：git branch -r --contains 对「本地有、远端没有」的提交
 # 是打印空 + 退出码 0，拿退出码判断会永远走不到这一支。
 if [ -z "$(git branch -r --contains "$SHA" 2>/dev/null)" ]; then
@@ -32,25 +30,31 @@ if [ -z "$(git branch -r --contains "$SHA" 2>/dev/null)" ]; then
   exit 2
 fi
 
-API="https://api.github.com/repos/${REPO}/commits/${SHA}/check-runs"
-TOTAL=""
-for attempt in 1 2 3; do
-  JSON=$(curl -sf --max-time 30 "$API") || { echo "✘ 查不到 ${REPO}@${SHA:0:7} 的 CI 记录（网络？仓库私有需带 token？）"; exit 2; }
-  TOTAL=$(printf '%s' "$JSON" | grep -o '"total_count":[0-9]*' | head -1 | cut -d: -f2)
-  [ -n "$TOTAL" ] && [ "$TOTAL" != "0" ] && break
-  [ "$attempt" = "3" ] && break
-  echo "… 远端已有该提交但还没有检查结论，流水线大概刚排队；15 秒后重试（$attempt/3）"
-  sleep 15
+RUNS_API="https://api.github.com/repos/${REPO}/actions/runs?head_sha=${SHA}"
+CHECK_API="https://api.github.com/repos/${REPO}/commits/${SHA}/check-runs"
+
+# 排队 → 登记之间可能有几分钟空窗，所以给一个有界观察窗口。
+# 问 runs 而不是只问 check-runs：后者要等 job 真正起跑才有内容，把它当「没触发」会误报。
+SEEN_RUN=0
+for attempt in 1 2 3 4 5 6; do
+  RUNS=$(curl -sf --max-time 30 "$RUNS_API") || { echo "✘ 查不到 ${REPO}@${SHA:0:7} 的运行记录（网络？私有库需带 token？）"; exit 2; }
+  if printf '%s' "$RUNS" | grep -qE '"status":"(queued|in_progress)"'; then
+    echo "… CI 还在排队/执行（${SHA:0:7}），等它结束再构建。"
+    exit 2
+  fi
+  printf '%s' "$RUNS" | grep -q '"total_count":[1-9]' && { SEEN_RUN=1; break; }
+  [ "$attempt" = "6" ] || sleep 20
 done
-if [ -z "$TOTAL" ] || [ "$TOTAL" = "0" ]; then
-  echo "✘ origin 上有 ${SHA:0:7}，但 GitHub 没有给它任何检查结论——工作流没被触发（分支不在 on: 里？Actions 页被禁用？）。去看一眼再构建。"
+if [ "$SEEN_RUN" = "0" ]; then
+  echo "✘ origin 上有 ${SHA:0:7}，但 GitHub 两分钟内一个工作流运行都没有 → 大概率没被触发"
+  echo "  （分支不在 on: 里？Actions 被禁用？仓库设置里 workflow 权限不足？）确认后再构建。"
   exit 2
 fi
 
-# conclusion 可能是 null（还在跑）、success、failure、cancelled…
+JSON=$(curl -sf --max-time 30 "$CHECK_API") || { echo "✘ 读 check-runs 失败（${SHA:0:7}）"; exit 2; }
 CONCLUSIONS=$(printf '%s' "$JSON" | grep -o '"conclusion":[^,}]*' | sed 's/"conclusion"://' | sort | uniq -c)
 if printf '%s' "$CONCLUSIONS" | grep -q 'null'; then
-  echo "… CI 还在跑（${SHA:0:7}），等它结束再构建。当前：$(printf '%s' "$CONCLUSIONS" | tr '\n' ' ')"
+  echo "… 运行已结束但检查结论还没落定（${SHA:0:7}），稍后再试。当前：$(printf '%s' "$CONCLUSIONS" | tr '\n' ' ')"
   exit 2
 fi
 if printf '%s' "$CONCLUSIONS" | grep -qv 'success'; then
@@ -59,4 +63,4 @@ if printf '%s' "$CONCLUSIONS" | grep -qv 'success'; then
   exit 1
 fi
 
-echo "✔ CI 全绿：${REPO}@${SHA:0:7}（$TOTAL 个检查）——可以构建镜像"
+echo "✔ CI 全绿：${REPO}@${SHA:0:7} —— 可以构建镜像"
