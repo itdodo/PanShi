@@ -87,6 +87,18 @@ bash scripts/prebuild-check.sh   # 退出码 0 才该继续构建
 ```
 
 它按 `origin` 上的 sha 查 GitHub 检查结论：工作区脏 / 还没 push / CI 在跑 → 2（并说明原因），CI 不全绿 → 1，全绿 → 0。
+匿名配额只有 60 次/小时，被限流时设 `GITHUB_TOKEN=<pat>` 再跑。
+
+部署走一条命令，别手敲 compose——门禁能被随手跳过时，赶时间就一定会被跳过：
+
+```bash
+bash scripts/deploy.sh                        # 前置检查 → 构建 → 起容器 → 冒烟 → 留痕
+bash scripts/deploy.sh --force "<理由>"       # 显式绕过，会大声打出来并记进日志
+```
+
+冒烟核的是响应而不只是状态码（SPA 兜底会把未知路径也回成 200）：就绪探针响应体要是 `Healthy`、
+验证码开关仍开着（`/auth/captcha` 回 `image/gif`）、无令牌访问业务端点回 401、生产 `/openapi/v1.json` 回 404、
+首页有 `id="app"`、启动日志零 `ERR/FTL`。每次结果追加到 `logs/deploy.log`（已 gitignore，本机部署史）。
 
 CI（`.github/workflows/ci.yml`）跑的就是这同一条命令——门禁只有一份定义，不在 yml 里另起一套步骤。
 它起一个 `postgres:17-alpine` 服务容器并把 `PANSHI_TEST_CONN` 指向一个**空库**，于是每次推送都顺带验证「全新库能完整引导」（CodeFirst 建表 → 迁移 → 种子）。本地想复现同样的条件：
