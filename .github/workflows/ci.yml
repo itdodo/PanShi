@@ -1,8 +1,12 @@
 name: CI
 
-# 门禁定义只有一份：本地和 CI 跑的都是 scripts/verify.sh 的五步
-# （后端编译 / 单元测试 / 集成测试 / 前端类型检查 / 前端构建）。
+# 门禁定义只有一份：本地和 CI 跑的都是 scripts/verify.sh 的六步
+# （后端编译 / 单元测试 / 集成测试 / 前端单测 / 前端类型检查 / 前端构建）。
 # 之前 vue-tsc 红着被 vite build 掩盖着跑了很多次，就是这个脚本存在的理由——所以别再另起一套 yml 里的步骤。
+#
+# 第二个 job 补的是 verify.sh 补不了的洞：schema.d.ts 是「快照」。
+# 只做类型对账的话，快照本身过期了照样全绿；这里让 CI 起一次 Development 后端、重新生成、
+# 和仓库里那份逐字节比——后端改了契约而快照没刷新，这一步就红。
 
 on:
   push:
@@ -19,7 +23,7 @@ concurrency:
 
 jobs:
   verify:
-    name: 五步验收
+    name: 六步验收
     runs-on: ubuntu-latest
     env:
       DOTNET_CLI_UI_LANGUAGE: en
@@ -70,3 +74,75 @@ jobs:
           done
           ( cd web && npm audit --audit-level=high ) || true
           echo "漏洞扫描结束（以上为提示，不影响本流水线结论）"
+
+  api-contract:
+    name: 契约快照未过期
+    runs-on: ubuntu-latest
+    needs: verify                       # 主门禁红了就没必要再看快照，两个信号也别混
+    env:
+      DOTNET_CLI_UI_LANGUAGE: en
+      ASPNETCORE_ENVIRONMENT: Development   # /openapi/v1.json 只在 Development 注册
+      ASPNETCORE_URLS: http://127.0.0.1:5125
+      Db__ConnectionString: "Host=localhost;Port=5432;Database=panshi_test;Username=panshi;Password=ci_panshi"
+    services:
+      pg:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: panshi
+          POSTGRES_PASSWORD: ci_panshi
+          POSTGRES_DB: panshi_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U panshi -d panshi_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: 安装前端依赖
+        run: npm ci --no-audit --no-fund
+        working-directory: web
+
+      # 空库 + 真 Program.cs 起后端：这一步顺带又证了一次「全新库能被应用本身引导起来」
+      # （集成测试的 fixture 是手工 new 服务的，不走容器，证不到这条）。
+      # 起服务、生成、对比写在同一个 step 里：后台进程跨 step 还活不活属于赌 runner 实现，没必要赌。
+      - name: 重新生成契约快照并与仓库里那份逐字节比
+        run: |
+          dotnet build src/Panshi.Api --nologo -v q
+          nohup dotnet run --project src/Panshi.Api --no-build --no-launch-profile > /tmp/api.log 2>&1 &
+          api_pid=$!
+          ready=0
+          for i in $(seq 1 90); do
+            if curl -sf http://127.0.0.1:5125/openapi/v1.json -o /dev/null; then ready=1; echo "openapi 就绪（第 ${i} 次探测，约 $((i * 2))s）"; break; fi
+            sleep 2
+          done
+          if [ "$ready" != 1 ]; then
+            echo "::error::后端 180 秒内没交出 /openapi/v1.json，启动日志末尾："
+            tail -60 /tmp/api.log
+            kill "$api_pid" 2>/dev/null || true
+            exit 1
+          fi
+
+          ( cd web && npm run api:gen )
+          kill "$api_pid" 2>/dev/null || true
+
+          if ! git diff --exit-code -- web/src/api/schema.d.ts; then
+            echo "::error::后端契约已变，但 web/src/api/schema.d.ts 还是旧快照。"
+            echo "  修法：本地 Development 起后端（dotnet run --project src/Panshi.Api，口令走 Db__ConnectionString），"
+            echo "  跑 npm run api:gen，再把新快照与 api/*.ts、contract.ts 的调整一起提交。差异头几段："
+            git diff --unified=0 -- web/src/api/schema.d.ts | head -80
+            exit 1
+          fi
+          echo "✔ schema.d.ts 与后端当前契约一致"

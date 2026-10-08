@@ -5,7 +5,7 @@
 .NET 10 + PostgreSQL 17 + Vue 3.5 + **Naive UI** 的完整后台框架：认证与会话治理、RBAC（角色管菜单权限 / 岗位管审批权限）、部门数据权限五档、钉钉式审批流引擎（可视化 DSL、会签/或签/依次/条件分支/驳回/加签/抄送）、审计三件套（操作/登录/字段级变更）、站内信 + SignalR 实时、定时任务 + 每日自动备份、报销单/采购申请单业务样板。
 
 - 重建规范：`docs/框架蓝图.md`
-- 现状文档：`docs/技术文档.md`（架构、28 表、API 一览、18 条红线对照、测试基线）
+- 现状文档：`docs/技术文档.md`（架构、44 表、API 一览、18 条红线对照、测试基线）
 - 前端约定：`docs/前端页面规约.md`
 
 ## 快速开始
@@ -85,7 +85,7 @@ curl -s -H "Authorization: Bearer $TOKEN" http://127.0.0.1:18080/api/v1/monitor/
 ## 验收（提交前必跑）
 
 ```bash
-bash scripts/verify.sh          # 后端编译 + 单元 + 集成（需 panshi-db 在跑）+ 前端类型检查 + 前端构建
+bash scripts/verify.sh          # 后端编译 + 单元 + 集成（需 panshi-db 在跑）+ 前端单测 + 前端类型检查 + 前端构建
 bash scripts/verify.sh --fast   # 跳过集成测试那一步
 ```
 
@@ -153,9 +153,13 @@ docker exec -i panshi-db psql -U panshi -d postgres -c "DROP DATABASE panshi_ci"
 
 ```bash
 dotnet build Panshi.slnx            # 0 错误 0 警告
-dotnet test Panshi.slnx             # 单元 61 + 集成 29（需 docker 起 panshi-db，测试库 panshi_test）
+dotnet test Panshi.slnx             # 单元 108 + 集成 120（需 docker 起 panshi-db，测试库 panshi_test）
+cd web && npm run test:unit         # 前端单测 28（vitest，node 环境，纯逻辑）
 cd web && npx vue-tsc --noEmit && npm run build
 ```
+
+前后端契约：`web/src/api/schema.d.ts` 是 `npm run api:gen` 从后端 `/openapi/v1.json`（仅 Development）生成的快照，
+`web/src/api/contract.ts` 拿它对账手写 DTO 的键集与类型——后端改了字段而前端没跟着改，`vue-tsc` 这一步就会红。
 
 ## 技术选型（与旧蓝图的差异）
 

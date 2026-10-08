@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# 提交前验收：一条命令跑完后端编译/两套测试 + 前端类型检查/构建。
+# 提交前验收：一条命令跑完后端编译/两套测试 + 前端单测/类型检查/构建。
 # 为什么要它：这一轮审计里发现 vue-tsc 一直是红的（wangEditor 类型入口问题），
-# 但因为 vite build 不受影响，没人被拦下来——红着跑了很多次。所以把五步钉成一条必跑命令。
+# 但因为 vite build 不受影响，没人被拦下来——红着跑了很多次。所以把六步钉成一条必跑命令。
 #
 # 用法：bash scripts/verify.sh          # 全跑
 #       bash scripts/verify.sh --fast    # 跳过集成测试（不需要数据库的那几步）
@@ -82,11 +82,17 @@ else
   fi
 fi
 
-# 4) 前端类型检查。注意：vite build 不会发现类型问题，所以这步不能被 build 代替。
+# 4) 前端单测：vitest 跑 node 环境，钉的全是纯逻辑（DSL 解析、分页排序映射、格式化）。
+#    需要真渲染的几何/交互仍走真机点测，这一层不假装覆盖；但也别再让「前端零测试」过夜。
+test_web() { (cd web && npm run test:unit); }
+step "前端单测" test_web
+
+# 5) 前端类型检查。注意：vite build 不会发现类型问题，所以这步不能被 build 代替。
+#    src/api/contract.ts 的编译期断言也在这一位里生效（后端字段改了 → 这里红）。
 typecheck_web() { (cd web && npx vue-tsc --noEmit); }
 step "前端类型检查" typecheck_web
 
-# 5) 前端构建。这一步观察到过一次偶发失败（单独重跑与整脚本重跑都是绿的，原因未定位），
+# 6) 前端构建。这一步观察到过一次偶发失败（单独重跑与整脚本重跑都是绿的，原因未定位），
 #    所以给它一次重试，并把两次的输出都留在 $LOG_DIR 里。
 build_web() { (cd web && npm run build); }
 step_retry "前端构建" web-build.log build_web

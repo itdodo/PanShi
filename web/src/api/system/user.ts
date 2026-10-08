@@ -16,10 +16,13 @@ export interface UserDto {
   status: number
   deptId?: string | null
   deptName?: string | null
-  roleNames?: string | null
   remark?: string | null
-  lastLoginTime?: string | null
+  /** 角色/岗位 id 由 UserService.ToDto 从关联表补齐，列表与详情都会带（不是可选项） */
+  roleIds: string[]
+  positionIds: string[]
   createTime: string
+  pwdUpdateTime: string
+  lastLoginTime?: string | null
   version: number
 }
 

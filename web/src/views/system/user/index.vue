@@ -49,7 +49,7 @@ import { STATUS_OPTIONS, pruneChildren, statusTag, toId, toIds, toNum, toStrIds,
  * 导入 POST /sys/user/import(multipart file) / 模板 GET /sys/user/import-template / 导出 GET /sys/user/export。
  * 视图内这几类动作直调 http（api/system/user.ts 的声明已同步为同一契约，接入与否另议）。
  */
-type UserRow = UserDto & { roleIds?: string[]; positionIds?: string[] }
+type UserRow = UserDto
 type UserQueryModel = {
   keyword: string
   deptId: string | null
@@ -180,8 +180,8 @@ function openEdit(row: UserRow): void {
   form.deptId = row.deptId ?? null
   form.status = row.status
   form.remark = row.remark ?? ''
-  form.roleIds = [...(row.roleIds ?? [])]
-  form.positionIds = [...(row.positionIds ?? [])]
+  form.roleIds = [...row.roleIds]
+  form.positionIds = [...row.positionIds]
   form.version = row.version
   modalVisible.value = true
 }
@@ -300,7 +300,7 @@ const columns = computed<DataTableColumns<UserRow>>(() => [
     key: 'roleIds',
     minWidth: 180,
     render: (row) => {
-      const ids = row.roleIds ?? []
+      const ids = row.roleIds
       if (!ids.length) return h('span', { class: 'ps-muted' }, '未分配')
       return h(
         NSpace,
