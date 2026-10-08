@@ -7,6 +7,7 @@ using Panshi.Api.Authorization;
 using Panshi.Api.Middleware;
 using Panshi.Api.Services;
 using Panshi.Common.Exceptions;
+using Panshi.Model.Dtos;
 using Panshi.Model.Entities;
 using Panshi.Repository;
 using Panshi.Service.Biz;
@@ -139,32 +140,30 @@ public class MonitorController(ISqlSugarClient db, RequestMetrics metrics) : Api
         var activeConnections = (await db.Ado.SqlQueryAsync<int>(
             "select count(*)::int from pg_stat_activity where datname = current_database()")).FirstOrDefault();
 
-        return new
+        return new MetricsDto
         {
-            machineName = Environment.MachineName,
-            uptimeMin = Math.Round((DateTime.Now - proc.StartTime).TotalMinutes, 1),
-            requests = new
+            MachineName = Environment.MachineName,
+            UptimeMin = Math.Round((DateTime.Now - proc.StartTime).TotalMinutes, 1),
+            Requests = new RequestCountersDto
             {
-                snap.Total, snap.Active, snap.ServerErrors, snap.ClientErrors, snap.Unauthorized,
-                snap.Forbidden, snap.Conflict, snap.Throttled, snap.AvgMs, snap.MaxMs
+                Total = snap.Total, Active = snap.Active, ServerErrors = snap.ServerErrors,
+                ClientErrors = snap.ClientErrors, Unauthorized = snap.Unauthorized, Forbidden = snap.Forbidden,
+                Conflict = snap.Conflict, Throttled = snap.Throttled, AvgMs = snap.AvgMs, MaxMs = snap.MaxMs
             },
-            gc = new
+            Gc = new GcStatsDto
             {
-                isServer = GCSettings.IsServerGC,
-                gen0 = GC.CollectionCount(0),
-                gen1 = GC.CollectionCount(1),
-                gen2 = GC.CollectionCount(2),
-                heapMb = Math.Round(GC.GetTotalMemory(false) / 1024.0 / 1024.0, 1),
-                committedMb = Math.Round(gc.TotalCommittedBytes / 1024.0 / 1024.0, 1),
-                // 自进程启动以来的 GC 停顿占比（%），不是区间值——看趋势用
-                pausePercent = Math.Round(gc.PauseTimePercentage, 2)
+                IsServer = GCSettings.IsServerGC,
+                Gen0 = GC.CollectionCount(0), Gen1 = GC.CollectionCount(1), Gen2 = GC.CollectionCount(2),
+                HeapMb = Math.Round(GC.GetTotalMemory(false) / 1024.0 / 1024.0, 1),
+                CommittedMb = Math.Round(gc.TotalCommittedBytes / 1024.0 / 1024.0, 1),
+                PausePercent = Math.Round(gc.PauseTimePercentage, 2)
             },
-            threads = new
+            Threads = new ThreadStatsDto
             {
-                workerBusy = workerMax - workerFree, workerMax, ioBusy = ioMax - ioFree, ioMax,
-                pool = proc.Threads.Count
+                WorkerBusy = workerMax - workerFree, WorkerMax = workerMax,
+                IoBusy = ioMax - ioFree, IoMax = ioMax, OsThreads = proc.Threads.Count
             },
-            db = new { activeConnections }
+            Db = new DbStatsDto { ActiveConnections = activeConnections }
         };
     }
 }

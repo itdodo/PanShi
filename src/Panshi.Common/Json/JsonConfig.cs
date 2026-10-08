@@ -42,6 +42,20 @@ public sealed class NullableLongToStringConverter : JsonConverter<long?>
     }
 }
 
+/// <summary>
+/// 计数类 long 的「保持数字」转换器。全局那条 long→string 是为雪花 id 服务的
+/// （JS number 装不下 64 位），但指标不是 id——把 total/avgMs 变成字符串，
+/// 下游 jq/Prometheus 侧就得先 tonumber 才能聚合，等于自废。
+/// </summary>
+public sealed class LongAsNumberConverter : JsonConverter<long>
+{
+    public override long Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        => reader.TokenType == JsonTokenType.String ? long.Parse(reader.GetString()!) : reader.GetInt64();
+
+    public override void Write(Utf8JsonWriter writer, long value, JsonSerializerOptions options)
+        => writer.WriteNumberValue(value);
+}
+
 /// <summary>全局 JSON 约定。</summary>
 public static class JsonConfig
 {

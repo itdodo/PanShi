@@ -104,6 +104,19 @@ public class ObservabilityTests
     public void 零请求时平均耗时是零而不是除零()
         => Assert.Equal(0, new RequestMetrics().Take().AvgMs);
 
+    [Fact]
+    public void 指标计数序列化成数字而不是字符串()
+    {
+        // 全局那条 long→string 是给雪花 id 的；指标要是变成 "7"，jq/Prometheus 侧就得先 tonumber
+        var json = System.Text.Json.JsonSerializer.Serialize(
+            new MetricsDto { Requests = new RequestCountersDto { Total = 7, Active = 1, MaxMs = 1196 } },
+            Panshi.Common.Json.JsonConfig.Options);
+        Assert.Contains("\"total\":7", json);
+        Assert.Contains("\"active\":1", json);
+        Assert.Contains("\"maxMs\":1196", json);
+        Assert.DoesNotContain("\"7\"", json);
+    }
+
     /* ---------------- 端点权限契约 ---------------- */
 
     private static string? MethodPolicy(Type controller, string action) =>
