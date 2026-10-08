@@ -47,6 +47,18 @@ cp .env.example .env      # 填 PANSHI_DB_PASSWORD 与 PANSHI_JWT_SECRET；.env 
 
 `/swagger` 与 `/openapi/v1.json` **仅开发态**暴露（生产等于把全部端点与 DTO 结构白送给任何能访问端口的人）。
 
+### 排障：关联 ID 与指标
+
+每条响应都带 `X-Correlation-Id`，同一次请求在服务端日志里也是同一个号（`[19:41:02 ERR] [c8f3…] …`）。用户报障时把这个号给运维即可定位。上游网关带来的号会被沿用，但只接受 8–64 位的 `[A-Za-z0-9._-]`，脏值一律重新发号。
+
+```bash
+curl -si http://127.0.0.1:18080/api/v1/health | grep -i x-correlation-id
+# 指标快照（要 monitor:server:list 权限）：状态码分布、平均/最大耗时、GC、线程池、数据库连接数
+curl -s -H "Authorization: Bearer $TOKEN" http://127.0.0.1:18080/api/v1/monitor/metrics
+```
+
+给的是**自启动累计量**，没有百分位也不引 Prometheus 依赖：要速率就按固定间隔抓两次算差值。
+
 ### 强制改密
 
 新建/导入/管理员重置的账号，口令未换之前服务端只放行 4 条端点（改密、看自己资料、刷新令牌、登出），其余一律 401 —— 前端路由的拦截只是提示，真正的门在 JWT 校验里。管理员重置密码会**同时下线该账号全部会话**并站内信通知本人。

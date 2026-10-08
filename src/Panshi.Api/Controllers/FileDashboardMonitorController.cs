@@ -1,7 +1,9 @@
 using System.Diagnostics;
+using System.Runtime;
 using System.Runtime.InteropServices;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Panshi.Api.Authorization;
 using Panshi.Api.Middleware;
 using Panshi.Api.Services;
 using Panshi.Common.Exceptions;
@@ -90,9 +92,14 @@ public class DashboardController(
 [Authorize]
 [Route("api/v1/monitor")]
 [Tags("监控")]
-public class MonitorController(ISqlSugarClient db) : ApiControllerBase
+public class MonitorController(ISqlSugarClient db, RequestMetrics metrics) : ApiControllerBase
 {
+    /// <summary>
+    /// ⚠️ 权限码是种子里早就有的 monitor:server:list——此前这个端点只挂 [Authorize]，
+    /// 等于任何登录用户（含没被授「服务监控」菜单的账号）都能读到 PG 版本、库大小与机器名。
+    /// </summary>
     [HttpGet("server")]
+    [HasPermission("monitor:server:list")]
     public async Task<object> Server()
     {
         var proc = Process.GetCurrentProcess();
@@ -111,6 +118,53 @@ public class MonitorController(ISqlSugarClient db) : ApiControllerBase
             startupTime = proc.StartTime,
             pgVersion,
             dbSize
+        };
+    }
+
+    /// <summary>
+    /// 进程内累计量快照：请求状态码分布 + 耗时（自启动累计，无百分位）+ GC/线程池 + 数据库连接占用。
+    /// 排障用法：按固定间隔抓两次，差值即速率；`db.activeConnections` 逼近连接池上限时
+    /// <c>requests.active</c> 也会同时抬高，那就是在排队而不是在算。
+    /// ⚠️ 只给累计量是刻意的——引真方方图/直方桶要加依赖，蓝图「明确不引入」清单挡着。
+    /// </summary>
+    [HttpGet("metrics")]
+    [HasPermission("monitor:server:list")]
+    public async Task<object> Metrics()
+    {
+        var proc = Process.GetCurrentProcess();
+        var snap = metrics.Take();
+        var gc = GC.GetGCMemoryInfo();
+        ThreadPool.GetAvailableThreads(out var workerFree, out var ioFree);
+        ThreadPool.GetMaxThreads(out var workerMax, out var ioMax);
+        var activeConnections = (await db.Ado.SqlQueryAsync<int>(
+            "select count(*)::int from pg_stat_activity where datname = current_database()")).FirstOrDefault();
+
+        return new
+        {
+            machineName = Environment.MachineName,
+            uptimeMin = Math.Round((DateTime.Now - proc.StartTime).TotalMinutes, 1),
+            requests = new
+            {
+                snap.Total, snap.Active, snap.ServerErrors, snap.ClientErrors, snap.Unauthorized,
+                snap.Forbidden, snap.Conflict, snap.Throttled, snap.AvgMs, snap.MaxMs
+            },
+            gc = new
+            {
+                isServer = GCSettings.IsServerGC,
+                gen0 = GC.CollectionCount(0),
+                gen1 = GC.CollectionCount(1),
+                gen2 = GC.CollectionCount(2),
+                heapMb = Math.Round(GC.GetTotalMemory(false) / 1024.0 / 1024.0, 1),
+                committedMb = Math.Round(gc.TotalCommittedBytes / 1024.0 / 1024.0, 1),
+                // 自进程启动以来的 GC 停顿占比（%），不是区间值——看趋势用
+                pausePercent = Math.Round(gc.PauseTimePercentage, 2)
+            },
+            threads = new
+            {
+                workerBusy = workerMax - workerFree, workerMax, ioBusy = ioMax - ioFree, ioMax,
+                pool = proc.Threads.Count
+            },
+            db = new { activeConnections }
         };
     }
 }

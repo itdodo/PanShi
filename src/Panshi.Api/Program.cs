@@ -53,6 +53,8 @@ builder.Services.AddOpenApi();
 builder.Services.AddProblemDetails();
 // 存活探针 /api/v1/health 不带依赖检查；就绪探针 /api/v1/health/ready 才真的问一次数据库
 builder.Services.AddHealthChecks().AddCheck<DbHealthCheck>("database", tags: ["ready"]);
+// 请求计数器：进程内单例，/api/v1/monitor/metrics 读它
+builder.Services.AddSingleton<RequestMetrics>();
 builder.Services.AddMemoryCache();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddSignalR();
@@ -95,7 +97,7 @@ builder.Services.AddRateLimiter(rl =>
 builder.Services.AddCors(cors => cors.AddPolicy("web", p => p
     .WithOrigins(builder.Configuration.GetSection("Cors:Origins").Get<string[]>() ?? ["http://localhost:5173"])
     .AllowAnyHeader().AllowAnyMethod().AllowCredentials()
-    .WithExposedHeaders("X-Captcha-Id", "X-Captcha-Enabled", "Content-Disposition")));
+    .WithExposedHeaders("X-Captcha-Id", "X-Captcha-Enabled", "X-Correlation-Id", "Content-Disposition")));
 
 builder.Services.AddPanshiAuth(builder.Configuration);
 // 图形验证码只要「字符清楚可读」：关掉默认配置里的干扰线与气泡噪点（内部系统不需要对抗式难度）。
@@ -212,6 +214,10 @@ app.Logger.LogInformation("来源 IP 解析：{Mode}", trustForwarded
 JobActivator.Current = new Panshi.Api.Jobs.ScopedJobActivator(
     app.Services.GetRequiredService<IServiceScopeFactory>());
 
+// 关联 ID 必须是管道第一站：后面的请求日志/异常中间件/指标都要拿到同一个号。
+// 计数器紧随其后，这样连「异常直写响应」的请求也进状态码分布。
+app.UseMiddleware<CorrelationIdMiddleware>();
+app.UseMiddleware<RequestMetricsMiddleware>();
 app.UseSerilogRequestLogging();
 app.UseMiddleware<ExceptionMiddleware>();
 app.UseCors("web");

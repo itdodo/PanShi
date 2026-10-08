@@ -25,7 +25,10 @@ public class ExceptionMiddleware(RequestDelegate next, IHostEnvironment env)
         }
         catch (Exception ex)
         {
-            Log.Error(ex, "未处理异常 {Path} {TraceId}", ctx.Request.Path, ctx.TraceIdentifier);
+            // 记关联 ID 而不是 TraceIdentifier：前者也回显在 X-Correlation-Id 响应头里，
+            // 用户报障时能直接引用；TraceIdentifier 客户端看不到。
+            var correlation = CorrelationIdMiddleware.Current(ctx) ?? ctx.TraceIdentifier;
+            Log.Error(ex, "未处理异常 {Path} {CorrelationId}", ctx.Request.Path, correlation);
             await WriteAsync(ctx, StatusCodes.Status500InternalServerError,
                 ApiResult.Fail(500, env.IsDevelopment() ? $"{ex.GetType().Name}: {ex.Message}" : "服务器内部错误，请联系管理员"));
         }
