@@ -5,7 +5,7 @@ import { useUserStore } from '@/stores/user'
 import { catchAllRoute, isWhitePath, staticRoutes } from './routes'
 
 export const FORCE_CHANGE_PWD_PATH = '/force/change-password'
-export const APP_TITLE = '磐石管理底座'
+export const APP_TITLE = '磐石管理系统'
 /** 记录因 chunk 加载失败已自动重载的目标，防同一目标反复重载 */
 const CHUNK_RELOAD_KEY = 'ps:chunk-reload'
 

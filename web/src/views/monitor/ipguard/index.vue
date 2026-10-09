@@ -179,7 +179,7 @@ async function submit(): Promise<boolean> {
 async function remove(row: IpRuleDto): Promise<void> {
   try {
     await deleteIpRule(row.id)
-    message.success('已删除，判定缓存同步失效')
+    message.success('已删除，规则立即生效')
     await list.load()
   } catch {
     /* 已提示 */
@@ -263,7 +263,7 @@ const columns = computed<DataTableColumns<IpRuleDto>>(() => [
                 { key: 'delete', onPositiveClick: () => remove(row) },
                 {
                   trigger: () => h(NButton, { size: 'tiny', text: true, type: 'error' }, { default: () => '删除' }),
-                  default: () => `删除「${row.cidr}」？判定缓存会立即失效。`
+                  default: () => `删除「${row.cidr}」？删除后立即生效。`
                 }
               )
             : null

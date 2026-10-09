@@ -393,7 +393,7 @@ function refreshDataItems(): void {
         </template>
 
         <NAlert v-if="!selectedType" type="info" :bordered="false">
-          单击左侧任一行即可加载该类型的数据项（接口 GET /sys/dict/data/type/:typeId）。
+          单击左侧任一行即可加载该类型的数据项。
         </NAlert>
         <NDataTable
           v-else

@@ -74,7 +74,7 @@ function onExpand(keys: Array<string | number>): void {
     <div class="ps-side" :class="{ 'ps-side--collapsed': props.collapsed }" :style="{ width: `${siderWidth}px` }">
       <div class="ps-side__brand">
         <span class="ps-side__logo"><icon-lucide-hexagon /></span>
-        <span v-show="!props.collapsed" class="ps-side__title ps-ellipsis">磐石管理底座</span>
+        <span v-show="!props.collapsed" class="ps-side__title ps-ellipsis">磐石管理系统</span>
       </div>
       <div class="ps-side__menu">
         <NMenu

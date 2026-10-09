@@ -196,10 +196,6 @@ function handleSubmit(): void {
         <NButton type="primary" size="large" block :loading="loading" @click="handleSubmit"> 登 录 </NButton>
       </NForm>
 
-      <p v-if="captcha.enabled" class="ps-login__tip">
-        验证码可在后端参数 <code>sys.captcha.enabled</code> 关闭，关闭后本行自动隐藏。
-      </p>
-
       <footer class="ps-login__foot">© 2026 磐石 Panshi · 企业内部系统</footer>
     </section>
   </div>
@@ -357,13 +353,6 @@ function handleSubmit(): void {
   width: 100%;
   height: 100%;
   object-fit: cover;
-}
-
-.ps-login__tip {
-  margin: 18px 0 0;
-  font-size: 12px;
-  color: var(--ps-text-3);
-  line-height: 1.7;
 }
 
 .ps-login__foot {
