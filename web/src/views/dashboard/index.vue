@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { NButton, NCard, NGrid, NGridItem, NSpace, NStatistic, NTag, NAlert } from 'naive-ui'
+import { NButton, NCard, NGrid, NGridItem, NSpace, NStatistic, NTag } from 'naive-ui'
 import { getDashboardStats, type DashboardStatsDto } from '@/api/dashboard'
 import { useNoticeStore } from '@/stores/notice'
 import { usePermissionStore } from '@/stores/permission'
@@ -9,7 +9,7 @@ import { useUserStore } from '@/stores/user'
 import { formatDate } from '@/utils/format'
 import AppIcon from '@/components/AppIcon.vue'
 
-/** 首页欢迎卡片（占位）：真实工作台在后续批次按菜单授权展开 */
+/** 首页：问候 + 四个业务量卡片（待办/未读/公告/可用功能）。数字优先取仪表盘接口，回落到本地 store */
 const router = useRouter()
 const user = useUserStore()
 const perm = usePermissionStore()
@@ -20,7 +20,7 @@ const tiles = computed(() => [
   { key: 'todo', label: '我的待办', value: stats.value.todoCount ?? notice.todoCount, icon: 'lucide:inbox', color: '#2563eb' },
   { key: 'unread', label: '未读消息', value: stats.value.unreadCount ?? notice.unreadCount, icon: 'lucide:mail', color: '#0ea5e9' },
   { key: 'notice', label: '在办公告', value: stats.value.noticeCount ?? 0, icon: 'lucide:megaphone', color: '#d97706' },
-  { key: 'menu', label: '可访问菜单', value: perm.accessRoutes.length, icon: 'lucide:list-tree', color: '#16a34a' }
+  { key: 'menu', label: '可用功能', value: perm.accessRoutes.length, icon: 'lucide:list-tree', color: '#16a34a' }
 ])
 
 const greeting = computed(() => {
@@ -46,14 +46,15 @@ onMounted(() => {
         <div>
           <h2 class="ps-hero__title">{{ greeting }}，{{ user.displayName }}</h2>
           <p class="ps-hero__sub">
-            欢迎使用 磐石管理底座 · 今天 {{ formatDate(new Date()) }} ·
+            欢迎使用 磐石管理系统 · 今天 {{ formatDate(new Date()) }} ·
             {{ user.profile?.deptName || '未分配部门' }}
           </p>
         </div>
         <NTag v-if="user.isAdmin" type="error" :bordered="false" size="small">内置管理员</NTag>
+        <NButton size="small" tertiary @click="router.push('/profile')">前往个人中心</NButton>
       </NSpace>
       <p class="ps-hero__desc">
-        左侧菜单由 <code>/api/v1/sys/menu/tree/my</code> 动态生成，页签、权限码与实时通知均已打通。
+        左边列出的是你有权使用的功能；有新消息时，右上角会提醒你。
       </p>
     </NCard>
 
@@ -69,14 +70,6 @@ onMounted(() => {
         </NCard>
       </NGridItem>
     </NGrid>
-
-    <NAlert type="info" :bordered="false" class="ps-hero__alert" title="骨架已就绪">
-      登录 / 令牌单飞刷新 / 动态路由 / 多页签 keep-alive / 亮暗主题 / SignalR 通知 已可用。
-      <NSpace :size="8" style="margin-top: 10px">
-        <NButton size="small" @click="router.push('/profile')">前往个人中心</NButton>
-        <NButton size="small" tertiary @click="router.back()">返回上一页</NButton>
-      </NSpace>
-    </NAlert>
   </div>
 </template>
 
@@ -126,10 +119,5 @@ onMounted(() => {
   height: 42px;
   border-radius: 11px;
   flex: none;
-}
-
-.ps-hero__alert {
-  margin-top: 14px;
-  border-radius: 12px;
 }
 </style>

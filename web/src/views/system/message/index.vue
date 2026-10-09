@@ -377,7 +377,7 @@ onMounted(() => {
               :autosize="{ minRows: 6, maxRows: 14 }"
               maxlength="2000"
               show-count
-              placeholder="选填。接收方在顶栏铃铛与本页面收到，实时推送由 SignalR 负责。"
+              placeholder="选填。接收方会在顶栏铃铛和这个页面看到。"
             />
           </NFormItem>
         </NForm>

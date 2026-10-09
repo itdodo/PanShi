@@ -276,7 +276,7 @@ onMounted(async () => {
                     <span v-if="!user.roles.length" class="ps-muted">未分配角色</span>
                   </NSpace>
                 </NDescriptionsItem>
-                <NDescriptionsItem label="权限码">{{ permissions }} 项</NDescriptionsItem>
+                <NDescriptionsItem label="功能权限">{{ permissions }} 项</NDescriptionsItem>
                 <NDescriptionsItem label="密码更新">
                   {{ formatDateTime(user.profile?.pwdUpdateTime) }}
                 </NDescriptionsItem>

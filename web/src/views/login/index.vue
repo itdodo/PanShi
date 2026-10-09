@@ -99,14 +99,14 @@ function handleSubmit(): void {
           <icon-lucide-hexagon />
           <span>磐石</span>
         </div>
-        <h1 class="ps-login__slogan">磐石管理底座</h1>
+        <h1 class="ps-login__slogan">磐石管理系统</h1>
         <p class="ps-login__desc">
-          统一权限 · 组织岗位 · 审批流引擎 · 文件与审计<br />一套面向企业内部系统的通用后端底座前端骨架。
+          统一权限 · 组织架构 · 审批流程 · 公告与消息<br />登录后能用什么，就看你被授予了哪些功能。
         </p>
         <ul class="ps-login__features">
-          <li><icon-lucide-shield-check /> RBAC 菜单/按钮级权限 + 数据权限五档</li>
-          <li><icon-lucide-git-pull-request-arrow /> 钉钉式审批流（会签/或签/依次/加签/驳回）</li>
-          <li><icon-lucide-file-text /> 文件白名单嗅探 + 字段级审计与乐观锁</li>
+          <li><icon-lucide-shield-check /> 按角色授权：看得到哪些菜单、管得到哪些数据</li>
+          <li><icon-lucide-git-pull-request-arrow /> 审批流：多人会签、依次审批、加签与驳回</li>
+          <li><icon-lucide-file-text /> 上传文件按类型把关，每次改动都留下可追溯的记录</li>
         </ul>
       </div>
       <!-- 抽象图形（纯装饰，无外部资源） -->
