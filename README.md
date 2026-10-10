@@ -153,7 +153,7 @@ docker exec -i panshi-db psql -U panshi -d postgres -c "DROP DATABASE panshi_ci"
 
 ```bash
 dotnet build Panshi.slnx            # 0 错误 0 警告
-dotnet test Panshi.slnx             # 单元 108 + 集成 120（需 docker 起 panshi-db，测试库 panshi_test）
+dotnet test Panshi.slnx             # 单元 108 + 集成 123（需 docker 起 panshi-db，测试库 panshi_test）
 cd web && npm run test:unit         # 前端单测 28（vitest，node 环境，纯逻辑）
 cd web && npx vue-tsc --noEmit && npm run build
 ```
