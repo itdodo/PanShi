@@ -96,4 +96,13 @@ public class SysDbMigration
 
     [SugarColumn(ColumnDataType = "timestamp")]
     public DateTime AppliedTime { get; set; }
+
+    /// <summary>
+    /// 脚本内容指纹（SHA-256 hex）。记账原本只认版本号，这一列让它同时认内容：
+    /// 已应用的迁移被改动 → 执行器拒绝启动（见 DbMigrationRunner.Guard）。
+    /// ⚠️ ColumnDataType 必须显式写 varchar：给已存在的表加 string 列时 SqlSugar 的 ALTER 路径会生成
+    /// text(64)，PG 直接 42601（详见 docs/技术文档.md §三）。历史行是 NULL，由执行器首次遇到时回填。
+    /// </summary>
+    [SugarColumn(IsNullable = true, ColumnDataType = "varchar(64)")]
+    public string? Checksum { get; set; }
 }
