@@ -9,6 +9,7 @@ import { usePermissionStore } from '@/stores/permission'
  * 左侧深色菜单：递归渲染后端菜单树（store 里递归转成 NMenu options）。
  * 叶子 key = 路由 path，目录 key = menu:id；图标经 utils/menuIcon 解析，未知图标兜底 Document。
  * 用内层 NConfigProvider(darkTheme) 固定深色，Menu 默认底色透明，故深色渐变可直接透出。
+ * 侧栏刻意不跟随全局亮暗开关：浅色界面里它是对比稳定的导航锚点，收起态的图标居中与可读性也依赖这层深底。
  */
 const props = withDefaults(defineProps<{ collapsed?: boolean; width?: number }>(), {
   collapsed: false,
@@ -90,9 +91,6 @@ function onExpand(keys: Array<string | number>): void {
           @update:expanded-keys="onExpand"
         />
       </div>
-      <div v-show="!props.collapsed" class="ps-side__foot">
-        <span>Vue3 · Naive UI · Vite</span>
-      </div>
     </div>
   </NConfigProvider>
 </template>
@@ -161,13 +159,5 @@ function onExpand(keys: Array<string | number>): void {
 
 .ps-side--collapsed :deep(.n-menu-item-content__icon) {
   margin-right: 0;
-}
-
-.ps-side__foot {
-  flex: none;
-  padding: 10px 16px;
-  font-size: 12px;
-  color: rgba(148, 163, 184, 0.6);
-  border-top: 1px solid rgba(148, 163, 184, 0.14);
 }
 </style>
