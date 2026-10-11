@@ -124,6 +124,12 @@ docker exec -i panshi-db psql -U panshi -d postgres -c "DROP DATABASE panshi_ci"
 ```
 `--fast` 之外还会在 `panshi-db` 没起时直接报错提示，而不是把集成测试静默跑成一片红。
 
+**「空库能引导」不等于「老库能升级」**，所以 CI 还有第三个 job 跑 `scripts/upgrade-check.sh`：它先用某个历史提交（`BASELINE_SHA`，当前钉在 `5631a98`）把演练库引导成「老库」，再用当前构建升上来，最后**再启一次**要求完全静默——迁移记账只认版本号，0005 那类「改已应用的迁移」只有在「先有老库、再升」这条路上才看得见。本地想自己跑一遍（要一个可以随便建表删表的库）：
+
+```bash
+BASELINE_SHA=5631a98 Db__ConnectionString="Host=localhost;Port=5432;Database=panshi_upgrade;Username=panshi;Password=<.env 里的值>" bash scripts/upgrade-check.sh
+```
+
 > 为什么单独强调「前端类型检查」：`vite build` 不做类型检查，所以类型错误可以让构建一路绿着过去。
 > 这一轮就撞上过——`@wangeditor/editor-for-vue` 的 `exports` 没暴露类型入口，`vue-tsc` 红了很久，
 > 但没人被拦下来。现在它是验收的第 4 步。

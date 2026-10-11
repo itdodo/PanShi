@@ -7,6 +7,8 @@ name: CI
 # 第二个 job 补的是 verify.sh 补不了的洞：schema.d.ts 是「快照」。
 # 只做类型对账的话，快照本身过期了照样全绿；这里让 CI 起一次 Development 后端、重新生成、
 # 和仓库里那份逐字节比——后端改了契约而快照没刷新，这一步就红。
+#
+# 第三个 job 补的是「空库引导」照不到的半个问题：老库能不能被升上来（见下方 upgrade 的注释）。
 
 on:
   push:
@@ -146,3 +148,46 @@ jobs:
             exit 1
           fi
           echo "✔ schema.d.ts 与后端当前契约一致"
+
+  # 第三个 job 补的是「空库引导」照不到的那半个问题：集成测试每次都是从零建库跑完整迁移，
+  # 它证明不了「线上那种已经跑到某个历史版本的库能不能被升上来」。0005（改已应用的迁移）
+  # 与 0014（指纹列要补记 13 行历史行）都属于这一类，只有「先有老库、再升」才会暴露。
+  # 具体步骤与断言在 scripts/upgrade-check.sh（本地也能跑），这里不重复一遍定义。
+  upgrade:
+    name: 老库能升到当前版本
+    runs-on: ubuntu-latest
+    needs: verify
+    env:
+      DOTNET_CLI_UI_LANGUAGE: en
+      # 演练库直接用本 job 自己的服务容器库（每个 job 一套新容器，进来就是空的）：
+      # 先由基线提交把它引导成「老库」，再由当前构建升上来，所以不需要额外的建库步骤。
+      Db__ConnectionString: "Host=localhost;Port=5432;Database=panshi_test;Username=panshi;Password=ci_panshi;Pooling=true"
+      # 老库锚点。结构大改或想让演练更贴近现网时可以前移——水位差由脚本自己数，不用改别处。
+      BASELINE_SHA: 5631a98
+    services:
+      pg:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: panshi
+          POSTGRES_PASSWORD: ci_panshi
+          POSTGRES_DB: panshi_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U panshi -d panshi_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0                 # 要检出历史提交才造得出「老库」
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: 老库升级演练
+        run: |
+          command -v psql >/dev/null 2>&1 || { sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client; }
+          bash scripts/upgrade-check.sh
