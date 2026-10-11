@@ -112,6 +112,8 @@ bash scripts/deploy.sh --force "<理由>"       # 显式绕过，会大声打出
 验证码开关仍开着（`/auth/captcha` 回 `image/gif`）、无令牌访问业务端点回 401、生产 `/openapi/v1.json` 回 404、
 首页有 `id="app"`、启动日志零 `ERR/FTL`。每次结果追加到 `logs/deploy.log`（已 gitignore，本机部署史）。
 
+**副本数**：按单副本部署（一个 api + 一个 db）。要横向扩，先读 `docs/技术文档.md` §九——权限与 IP 黑名单的缓存失效、验证码存储这两项是前置（跨副本不生效），雪花机器号、限流、SignalR、上传/备份目录、指标是必须一并调整的预期。
+
 CI（`.github/workflows/ci.yml`）跑的就是这同一条命令——门禁只有一份定义，不在 yml 里另起一套步骤。
 它起一个 `postgres:17-alpine` 服务容器并把 `PANSHI_TEST_CONN` 指向一个**空库**，于是每次推送都顺带验证「全新库能完整引导」（CodeFirst 建表 → 迁移 → 种子）。本地想复现同样的条件：
 
